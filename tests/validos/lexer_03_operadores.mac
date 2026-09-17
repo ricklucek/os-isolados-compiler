@@ -1,0 +1,8 @@
+bool logica;
+logica receba VER E FAL OU NÃO FAL XOR VER;
+inteira a;
+inteira b;
+a receba 10 // 3;
+b receba 2 ^ 3 + raiz(9) - 1 * 4 / 2;
+cond ( a == b ) edai [ respost a; ]
+cond ( a ! b ) edai [ respost b; ]
