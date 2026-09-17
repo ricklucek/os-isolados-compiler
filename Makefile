@@ -1,15 +1,16 @@
 CC := gcc
 CFLAGS := -std=c99 -Wall -Wextra -pedantic
+LDFLAGS :=
 TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser test-ast test-semantic
+.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness sanitize test-sanitize
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET)
+	$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o $(TARGET)
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -17,7 +18,7 @@ src/%.o: src/%.c
 run: $(TARGET)
 	./$(TARGET) examples/exemplo_minimo.mac
 
-test: test-lexer test-parser test-ast test-semantic
+test: test-lexer test-parser test-ast test-semantic test-robustness
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -81,5 +82,19 @@ test-semantic: $(TARGET)
 	done
 	@echo "Todos os testes semanticos passaram."
 
+test-robustness: $(TARGET)
+	@echo "== Robustez e tratamento de erros =="
+	@sh tests/robustez/run.sh ./$(TARGET)
+
+sanitize:
+	@$(MAKE) clean
+	@$(MAKE) CFLAGS="$(CFLAGS) -g -fsanitize=address,undefined -fno-omit-frame-pointer" \
+		LDFLAGS="-fsanitize=address,undefined" all
+
+test-sanitize: sanitize
+	@ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+		UBSAN_OPTIONS=halt_on_error=1 \
+		sh tests/robustez/run.sh ./$(TARGET)
+
 clean:
-	rm -f $(OBJ) $(TARGET) .ast-test.out
+	rm -f $(OBJ) $(TARGET) .ast-test.out .robustness-test.out .robustness-test.err

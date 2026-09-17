@@ -24,6 +24,7 @@ O projeto não gera código de máquina nem código intermediário executável. 
 src/             código-fonte C
 tests/validos/   programas Macaronica válidos
 tests/invalidos/ programas Macaronica inválidos
+tests/robustez/  testes de falhas, recuperação e entradas adversas
 docs/            gramática, arquitetura e decisões de projeto
 examples/        exemplos simples para execução manual
 ```
@@ -36,7 +37,7 @@ Requisitos: GCC com suporte a C99 e `make`.
 make
 ```
 
-O projeto é compilado com:
+O projeto é compilado normalmente com:
 
 ```text
 -std=c99 -Wall -Wextra -pedantic
@@ -74,6 +75,12 @@ Exibir a AST:
 ./macaronica programa.mac --ast
 ```
 
+Ajuda da CLI:
+
+```bash
+./macaronica --help
+```
+
 `--ast` pode ser combinado com `--parser-only`. `--lexer-only` não pode ser combinado com `--ast` ou `--parser-only`.
 
 Exemplo padrão:
@@ -81,6 +88,19 @@ Exemplo padrão:
 ```bash
 make run
 ```
+
+## Códigos de saída
+
+| Código | Resultado |
+|---:|---|
+| 0 | sucesso |
+| 1 | uso inválido da CLI |
+| 2 | erro léxico |
+| 3 | falha de leitura/memória no lexer |
+| 4 | erro sintático |
+| 5 | falha interna/memória no parser |
+| 6 | erro semântico |
+| 7 | falha interna/memória no analisador semântico |
 
 ## Testes
 
@@ -97,7 +117,16 @@ make test-lexer
 make test-parser
 make test-ast
 make test-semantic
+make test-robustness
 ```
+
+Para uma verificação opcional com AddressSanitizer e UndefinedBehaviorSanitizer:
+
+```bash
+make test-sanitize
+```
+
+O alvo com sanitizers depende de suporte do compilador/plataforma e, por isso, não é executado automaticamente por `make test`.
 
 ## Limpeza
 
@@ -133,14 +162,16 @@ Analisador semântico
 programa válido ou diagnósticos
 ```
 
+Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a próxima etapa. Erros recuperáveis dentro da mesma fase são acumulados quando possível. Detalhes estão em `docs/robustez.md`.
+
 ## Plano de desenvolvimento
 
 - Checkpoint 0 — estrutura, especificação, decisões e repositório — concluído
 - Checkpoint 1 — analisador léxico — concluído
 - Checkpoint 2 — gramática e analisador sintático — concluído
 - Checkpoint 3 — AST — concluído
-- Checkpoint 4 — analisador semântico e tabela de símbolos — concluído nesta entrega
-- Checkpoint 5 — tratamento e recuperação de erros
+- Checkpoint 4 — analisador semântico e tabela de símbolos — concluído
+- Checkpoint 5 — tratamento de erros e robustez — concluído nesta entrega
 - Checkpoint 6 — testes e documentação final
 - Checkpoint 7 — roteiro de estudo e defesa do código
 
