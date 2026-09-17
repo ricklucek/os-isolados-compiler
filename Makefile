@@ -4,7 +4,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser
+.PHONY: all clean run test test-lexer test-parser test-ast
 
 all: $(TARGET)
 
@@ -17,7 +17,7 @@ src/%.o: src/%.c
 run: $(TARGET)
 	./$(TARGET) examples/exemplo_minimo.mac
 
-test: test-lexer test-parser
+test: test-lexer test-parser test-ast
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -51,5 +51,19 @@ test-parser: $(TARGET)
 	done
 	@echo "Todos os testes sintaticos passaram."
 
+test-ast: $(TARGET)
+	@echo "== Construcao e estrutura da AST =="
+	@./$(TARGET) tests/validos/ast_01_completo.mac --ast > .ast-test.out
+	@grep -q "PROGRAM" .ast-test.out
+	@grep -q "FUNCTION" .ast-test.out
+	@grep -q "PRINCIPAL" .ast-test.out
+	@grep -q "FOR" .ast-test.out
+	@grep -q "IF" .ast-test.out
+	@grep -q "CALL" .ast-test.out
+	@grep -q "VECTOR_ACCESS" .ast-test.out
+	@grep -q "BINARY_EXPR" .ast-test.out
+	@rm -f .ast-test.out
+	@echo "AST construida com os nos estruturais esperados."
+
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f $(OBJ) $(TARGET) .ast-test.out
