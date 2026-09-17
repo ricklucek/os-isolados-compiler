@@ -1,0 +1,11 @@
+outrafuncao inteira quadrado(inteira n) @
+[
+    respost n * n;
+]
+
+inteira principal() @
+[
+    inteira resultado;
+    resultado receba quadrado(5);
+    respost resultado;
+]

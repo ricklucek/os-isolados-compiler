@@ -1,6 +1,6 @@
 # Decisões de Projeto — Macaronica
 
-Este documento registra decisões tomadas pelo grupo para resolver lacunas e ambiguidades da especificação.
+Este documento registra decisões tomadas pelo grupo para resolver lacunas e ambiguidades da especificação. Sempre que a especificação não é suficiente, a decisão é explicitada em vez de ser incorporada silenciosamente ao código.
 
 ## D01 — Linguagem implementada
 
@@ -8,84 +8,134 @@ A disciplina é Linguagens Formais e Compiladores; portanto, o grupo implementar
 
 ## D02 — Acesso a vetor
 
-**Status:** proposta inicial, deve ser validada pelo grupo antes do parser.
+**Status: adotada.**
 
-A especificação define `tipo vet{tamanho} nome`, mas não define explicitamente a sintaxe de acesso. A proposta inicial é `nome{indice}`.
+A especificação define `tipo vet{tamanho} nome`, mas não define o acesso. Foi adotado:
+
+```text
+nome{indice}
+```
+
+Justificativa: reutiliza o delimitador associado a vetores e mantém o acesso distinguível de uma chamada de função.
 
 ## D03 — Chamada de função
 
-**Status:** proposta inicial.
+**Status: adotada.**
 
-A chamada seguirá `nome(argumento1, argumento2, ...)`, conforme a convenção natural indicada no enunciado.
+A chamada de função segue:
+
+```text
+nome(argumento1, argumento2, ...)
+```
+
+É a convenção natural indicada pelo próprio enunciado para a lacuna de chamada de função.
 
 ## D04 — Retorno em função `vazio`
 
-**Status:** proposta inicial.
+**Status: adotada sintaticamente; validação semântica pendente.**
 
-Funções `vazio` poderão omitir `respost`. Caso utilizado, será aceito `respost;`, nunca `respost valor;`.
+Funções de retorno `vazio` podem omitir `respost` ou utilizar:
+
+```text
+respost;
+```
+
+`respost valor;` continua sintaticamente reconhecível porque a compatibilidade entre retorno e assinatura pertence ao analisador semântico; nessa fase ele deverá ser rejeitado quando a função for `vazio`.
 
 ## D05 — Localização de erros
 
-**Status:** consolidada no Checkpoint 1.
-
-Cada token guarda linha e coluna inicial. O lexer mantém essas posições durante a varredura e as mensagens de erro léxico indicam ambas.
+Tokens armazenam linha e coluna. Lexer e parser usam esses dados nos diagnósticos.
 
 ## D06 — AST
 
-O parser produzirá uma AST para separar análise sintática de análise semântica e facilitar inspeção, testes e explicação do projeto.
+O parser será conectado a uma AST no Checkpoint 3. O Checkpoint 2 valida a estrutura sintática sem ainda construir a representação intermediária.
 
 ## D07 — Palavras estruturais ausentes da lista de reservadas
 
-**Status:** consolidada no Checkpoint 1.
+**Status: adotada.**
 
-`registro`, `outrafuncao`, `edai` e `vet` aparecem nas formas sintáticas, embora não estejam na lista explícita de palavras reservadas.
-
-**Decisão:** o lexer reconhece os quatro como palavras estruturais específicas.
+`registro`, `outrafuncao`, `edai` e `vet` aparecem nas estruturas da linguagem, embora não estejam todas na lista explícita de palavras reservadas. O lexer as reconhece como palavras estruturais para tornar analisáveis as formas fornecidas pelo próprio enunciado.
 
 ## D08 — Símbolos usados nas estruturas, mas ausentes do alfabeto
 
-**Status:** parcialmente consolidada no Checkpoint 1.
+**Status: parcialmente adotada.**
 
-`@` e `,` não aparecem no alfabeto listado, mas aparecem nas estruturas e exemplos.
-
-**Decisão:** ambos são reconhecidos como tokens. Aspas para literais de `palavra` continuam pendentes.
+`@` e `,` aparecem nas estruturas/exemplos e são reconhecidos pelo lexer, mesmo ausentes do alfabeto listado. Aspas/literais textuais continuam pendentes porque a especificação não fornece uma sintaxe para `palavra`.
 
 ## D09 — Operador lógico `NÃO` e alfabeto ASCII
 
-**Status:** consolidada no Checkpoint 1.
+**Status: adotada.**
 
-**Decisão:** aceitar literalmente `NÃO` em UTF-8 e não criar o alias `NAO`, preservando o lexema fornecido pela especificação.
+O lexer aceita literalmente `NÃO` em UTF-8, como escrito na tabela da linguagem. Não foi criado o alias `NAO`, pois ele não aparece na especificação.
 
 ## D10 — Entrada e saída na Macaronica
 
-**Status:** pendente de decisão.
+**Status: pendente.**
 
-Os casos de teste obrigatórios pedem uso de entrada/saída, mas a seção da Macaronica não fornece uma construção de leitura ou impressão. A sintaxe não será inventada sem registro; o grupo deverá consolidar uma convenção ou confirmar com o professor antes de fechar a gramática.
+Os casos obrigatórios pedem entrada/saída, mas a seção da Macaronica não fornece comandos correspondentes. Essa sintaxe não será inventada sem registro; deverá ser definida antes dos testes finais ou confirmada com o professor.
 
 ## D11 — Literal do tipo `palavra`
 
-**Status:** pendente de decisão.
+**Status: pendente.**
 
-O tipo `palavra` é definido, mas a especificação não formaliza a sintaxe de literal textual e aspas não aparecem no alfabeto. O Checkpoint 1 não reconhece literal textual.
+O tipo `palavra` existe, mas a especificação não formaliza literal textual. Por isso, strings ainda não fazem parte do lexer/parser.
 
-## D12 — Literais de `flut` e `duplocarpado`
+## D12 — `func` versus `outrafuncao`
 
-**Status:** consolidada no Checkpoint 1.
+**Status: adotada.**
 
-**Decisão:** adotar `DIGITO+ '.' DIGITO+` para literais reais. O ponto somente é aceito dentro desse padrão e não existe como token isolado.
+`func` aparece na lista de palavras reservadas, enquanto a estrutura de função não-principal usa `outrafuncao`. O lexer mantém `func` como token reservado, mas o parser não atribui uma produção a ele. Funções não-principais são declaradas com `outrafuncao`. Se `func` aparecer onde uma declaração global é esperada, o parser informa explicitamente a inconsistência.
 
-## D13 — Identificadores
+## D13 — Inicialização e iteração de `repete`
 
-**Status:** consolidada no Checkpoint 1.
+**Status: adotada.**
 
-Identificadores seguem `LETRA (LETRA | DIGITO)*`, usando apenas `a..z`, `A..Z` e `0..9`. `_` não é aceito porque não consta no alfabeto fornecido.
+A forma original é `repete ( var , condição , iteração ) edai [ ... ]`, mas `var` e `iteração` não são formalizadas. Foi adotado:
 
-## D14 — Comentários
+```text
+repete ( atribuicao , condicao , atribuicao ) edai [ ... ]
+```
 
-**Status:** pendente.
+As atribuições internas não levam `;`, porque a vírgula é o separador estrutural já indicado na especificação.
 
-A especificação não define comentários. O lexer não interpreta `//` como comentário porque esse lexema é explicitamente definido como operador de divisão inteira.
+## D14 — `raiz()`
+
+**Status: adotada.**
+
+O operador `raiz()` é interpretado sintaticamente como uma operação com uma expressão argumento:
+
+```text
+raiz(expressao)
+```
+
+A verificação de tipo do argumento será semântica.
+
+## D15 — Declarações globais de variáveis
+
+**Status: adotada.**
+
+A especificação apresenta declaração de variável como estrutura da linguagem sem restringi-la explicitamente ao corpo de funções. O parser aceita declarações globais. A tabela de símbolos do próximo checkpoint distinguirá escopo global e escopos de função.
+
+## D16 — Uso de `vazio`
+
+**Status: adotada.**
+
+`vazio` é aceito apenas como tipo de retorno de função/principal, conforme a observação da especificação de que `void` é apenas tipo de retorno. Declarações `vazio x;` e parâmetros `vazio x` são erros sintáticos.
+
+## D17 — Regra de condição
+
+**Status: adotada literalmente.**
+
+A especificação declara explicitamente:
+
+```text
+CONDIÇÃO -> VAR COMPARADOR VAR
+CONDIÇÃO -> VAR COMPARADOR NUM
+CONDIÇÃO -> NUM COMPARADOR NUM
+```
+
+O parser não amplia essa produção para uma expressão booleana arbitrária. Operadores `OU`, `E`, `NÃO` e `XOR` continuam disponíveis em expressões gerais, mas uma condição de `cond`, `durante` ou `repete` deve seguir a forma explícita acima.
 
 ## Novas ambiguidades encontradas
 
-Toda nova lacuna deve ser registrada com descrição, decisão, justificativa e impacto na gramática ou semântica.
+Toda nova lacuna deverá ser adicionada contendo descrição, decisão, justificativa e impacto na gramática ou semântica.
