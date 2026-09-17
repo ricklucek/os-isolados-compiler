@@ -1,0 +1,6 @@
+flut taxa;
+duplocarpado total;
+inteira vet{10} numeros;
+taxa receba 12.5;
+total receba 100.25;
+numeros{0} receba 7;
