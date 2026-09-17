@@ -1,0 +1,14 @@
+outrafuncao vazio registra(bool ativo) @
+[
+    respost;
+]
+
+inteira principal() @
+[
+    bool ativo;
+    duplocarpado valor;
+    ativo receba VER;
+    valor receba raiz(9);
+    registra(ativo);
+    respost 0;
+]

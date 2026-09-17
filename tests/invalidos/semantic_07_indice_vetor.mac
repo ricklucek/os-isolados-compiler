@@ -1,0 +1,8 @@
+inteira principal() @
+[
+    inteira vet{2} valores;
+    flut indice;
+    indice receba 1.5;
+    valores{indice} receba 10;
+    respost 0;
+]

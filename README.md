@@ -16,7 +16,7 @@ Implementar em C as três etapas iniciais do front-end de um compilador:
 2. análise sintática;
 3. análise semântica.
 
-O projeto não gera código de máquina nem código intermediário executável. O resultado será a validação da entrada e a emissão de erros léxicos, sintáticos e semânticos.
+O projeto não gera código de máquina nem código intermediário executável. O resultado é a validação da entrada e a emissão de erros léxicos, sintáticos e semânticos.
 
 ## Estrutura
 
@@ -44,31 +44,37 @@ O projeto é compilado com:
 
 ## Execução
 
-Pipeline léxico + sintático + construção da AST:
+Pipeline completo — léxico, sintático, AST e semântico:
 
 ```bash
 ./macaronica caminho/para/programa.mac
 ```
 
-Exibir os tokens:
+Exibir tokens:
 
 ```bash
 ./macaronica programa.mac --tokens
 ```
 
-Executar somente a análise léxica:
+Executar somente o lexer:
 
 ```bash
 ./macaronica programa.mac --lexer-only
 ```
 
-Exibir a AST produzida pelo parser:
+Executar até o parser, sem análise semântica:
+
+```bash
+./macaronica programa.mac --parser-only
+```
+
+Exibir a AST:
 
 ```bash
 ./macaronica programa.mac --ast
 ```
 
-As opções `--tokens` e `--ast` podem ser combinadas. `--ast` não pode ser usado com `--lexer-only`.
+`--ast` pode ser combinado com `--parser-only`. `--lexer-only` não pode ser combinado com `--ast` ou `--parser-only`.
 
 Exemplo padrão:
 
@@ -78,16 +84,19 @@ make run
 
 ## Testes
 
+Executar toda a suíte:
+
 ```bash
 make test
 ```
 
-Ou por etapa:
+Ou uma etapa específica:
 
 ```bash
 make test-lexer
 make test-parser
 make test-ast
+make test-semantic
 ```
 
 ## Limpeza
@@ -96,13 +105,41 @@ make test-ast
 make clean
 ```
 
+## Pipeline atual
+
+```text
+fonte Macaronica
+      |
+      v
+    Lexer
+      |
+    tokens
+      |
+      v
+    Parser
+      |
+     AST
+      |
+      v
+Analisador semântico
+      |
+      +-- tabela de símbolos
+      +-- escopos
+      +-- verificação de tipos
+      +-- assinaturas de funções
+      +-- retornos
+      |
+      v
+programa válido ou diagnósticos
+```
+
 ## Plano de desenvolvimento
 
 - Checkpoint 0 — estrutura, especificação, decisões e repositório — concluído
 - Checkpoint 1 — analisador léxico — concluído
 - Checkpoint 2 — gramática e analisador sintático — concluído
-- Checkpoint 3 — AST — concluído nesta entrega
-- Checkpoint 4 — analisador semântico e tabela de símbolos
+- Checkpoint 3 — AST — concluído
+- Checkpoint 4 — analisador semântico e tabela de símbolos — concluído nesta entrega
 - Checkpoint 5 — tratamento e recuperação de erros
 - Checkpoint 6 — testes e documentação final
 - Checkpoint 7 — roteiro de estudo e defesa do código

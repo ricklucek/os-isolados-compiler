@@ -4,11 +4,12 @@
 #include "ast.h"
 #include "lexer.h"
 #include "parser.h"
+#include "semantic.h"
 #include "token.h"
 
 static void print_usage(const char *program) {
     fprintf(stderr,
-            "Uso: %s <arquivo.mac> [--tokens] [--ast] [--lexer-only]\n",
+            "Uso: %s <arquivo.mac> [--tokens] [--ast] [--lexer-only] [--parser-only]\n",
             program);
 }
 
@@ -17,9 +18,11 @@ int main(int argc, char *argv[]) {
     int print_tokens = 0;
     int print_ast = 0;
     int lexer_only = 0;
+    int parser_only = 0;
     TokenList tokens;
     LexerStatus lexer_status;
     ParserResult parser_result;
+    SemanticResult semantic_result;
     AstNode *ast = NULL;
     size_t invalid_count;
     int i;
@@ -37,15 +40,17 @@ int main(int argc, char *argv[]) {
             print_ast = 1;
         else if (strcmp(argv[i], "--lexer-only") == 0)
             lexer_only = 1;
+        else if (strcmp(argv[i], "--parser-only") == 0)
+            parser_only = 1;
         else {
             print_usage(argv[0]);
             return 1;
         }
     }
 
-    if (lexer_only && print_ast) {
+    if ((lexer_only && print_ast) || (lexer_only && parser_only)) {
         fprintf(stderr,
-                "Erro: --ast nao pode ser combinado com --lexer-only.\n");
+                "Erro: --lexer-only nao pode ser combinado com --ast ou --parser-only.\n");
         return 1;
     }
 
@@ -104,6 +109,31 @@ int main(int argc, char *argv[]) {
         ast_print(ast, stdout);
     }
 
+    if (parser_only) {
+        ast_free(ast);
+        token_list_free(&tokens);
+        return 0;
+    }
+
+    semantic_result = semantic_analyze(ast, stderr);
+    if (semantic_result.status == SEMANTIC_HAS_ERRORS) {
+        fprintf(stderr,
+                "Analise semantica concluida com %zu erro(s).\n",
+                semantic_result.error_count);
+        ast_free(ast);
+        token_list_free(&tokens);
+        return 6;
+    }
+
+    if (semantic_result.status == SEMANTIC_MEMORY_ERROR) {
+        fprintf(stderr,
+                "Analise semantica interrompida por falta de memoria.\n");
+        ast_free(ast);
+        token_list_free(&tokens);
+        return 7;
+    }
+
+    printf("Analise semantica: OK.\n");
     ast_free(ast);
     token_list_free(&tokens);
     return 0;

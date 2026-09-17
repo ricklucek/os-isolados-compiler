@@ -32,7 +32,7 @@ nome(argumento1, argumento2, ...)
 
 ## D04 — Retorno em função `vazio`
 
-**Status: adotada sintaticamente; validação semântica pendente.**
+**Status: adotada e validada semanticamente.**
 
 Funções de retorno `vazio` podem omitir `respost` ou utilizar:
 
@@ -40,7 +40,7 @@ Funções de retorno `vazio` podem omitir `respost` ou utilizar:
 respost;
 ```
 
-`respost valor;` continua sintaticamente reconhecível porque a compatibilidade entre retorno e assinatura pertence ao analisador semântico; nessa fase ele deverá ser rejeitado quando a função for `vazio`.
+`respost valor;` é reconhecido sintaticamente para permitir um diagnóstico semântico específico, mas é rejeitado pelo analisador semântico quando a função tem retorno `vazio`.
 
 ## D05 — Localização de erros
 
@@ -52,7 +52,7 @@ Tokens armazenam linha e coluna. Lexer, parser e nós da AST preservam esses dad
 
 O parser constrói uma AST durante a análise sintática. A árvore é entregue somente quando não existem erros sintáticos; árvores parciais são liberadas. Os nós mantêm tipo estrutural (`AstNodeKind`), token relacionado, lexema quando aplicável, linha/coluna e uma lista dinâmica de filhos.
 
-A AST passa a ser a representação de entrada do analisador semântico do Checkpoint 4.
+A AST é a representação de entrada do analisador semântico.
 
 ## D07 — Palavras estruturais ausentes da lista de reservadas
 
@@ -104,7 +104,7 @@ As atribuições internas não levam `;`, porque a vírgula é o separador estru
 
 ## D14 — `raiz()`
 
-**Status: adotada.**
+**Status: adotada e validada semanticamente.**
 
 O operador `raiz()` é interpretado sintaticamente como uma operação com uma expressão argumento:
 
@@ -112,13 +112,13 @@ O operador `raiz()` é interpretado sintaticamente como uma operação com uma e
 raiz(expressao)
 ```
 
-A verificação de tipo do argumento será semântica.
+O argumento deve possuir tipo numérico. O resultado é `flut`, ou `duplocarpado` quando o argumento já possui esse tipo.
 
 ## D15 — Declarações globais de variáveis
 
-**Status: adotada.**
+**Status: adotada e implementada.**
 
-A especificação apresenta declaração de variável como estrutura da linguagem sem restringi-la explicitamente ao corpo de funções. O parser aceita declarações globais. A tabela de símbolos do próximo checkpoint distinguirá escopo global e escopos de função.
+A especificação apresenta declaração de variável como estrutura da linguagem sem restringi-la explicitamente ao corpo de funções. O parser aceita declarações globais e a tabela de símbolos distingue escopo global, escopos de função e escopos aninhados.
 
 ## D16 — Uso de `vazio`
 
@@ -153,6 +153,54 @@ Essa forma mantém na árvore a associação de todos os declaradores ao mesmo t
 **Status: adotada.**
 
 O parser pode continuar recuperando-se de erros para produzir múltiplos diagnósticos, mas uma AST parcial nunca segue para a análise semântica. Se `error_count > 0`, toda a árvore construída é liberada.
+
+## D20 — Escopos semânticos
+
+**Status: adotada.**
+
+A tabela de símbolos implementa escopo global, escopo de função e escopos aninhados para blocos de controle. Declarações duplicadas são proibidas no mesmo escopo; sombreamento em um escopo interno é permitido.
+
+## D21 — Pré-declaração de funções
+
+**Status: adotada.**
+
+A análise semântica registra as assinaturas de todas as funções e de `principal` antes de analisar os corpos. Isso permite recursão e chamadas a funções declaradas mais adiante. Variáveis globais e locais continuam respeitando a ordem em que são declaradas.
+
+## D22 — Tipo dos literais reais
+
+**Status: adotada.**
+
+Como a especificação possui `flut` e `duplocarpado`, mas fornece uma única forma léxica para número real, `REAL_LITERAL` é tipado como `flut`. Promoção de `flut` para `duplocarpado` é aceita.
+
+## D23 — Promoção numérica
+
+**Status: adotada.**
+
+Conversões implícitas seguem somente o sentido:
+
+```text
+inteira -> flut -> duplocarpado
+```
+
+Conversões inversas são rejeitadas para evitar perda implícita de informação. Tipos `bool` e `palavra` não são convertidos implicitamente para números.
+
+## D24 — Semântica de `/` e `//`
+
+**Status: adotada.**
+
+`//` aceita apenas `inteira` e retorna `inteira`. `/` aceita tipos numéricos e retorna `flut`, ou `duplocarpado` se algum operando já for `duplocarpado`.
+
+## D25 — Retorno de funções
+
+**Status: adotada.**
+
+Funções não-`vazio` devem possuir ao menos um `respost` e cada retorno deve ser compatível com a assinatura. Funções `vazio` aceitam ausência de retorno ou `respost;`, mas rejeitam `respost valor;`. A análise de fluxo completa para provar retorno em todos os caminhos não é realizada neste checkpoint.
+
+## D26 — Campos de registro
+
+**Status: adotada parcialmente.**
+
+Campos declarados dentro de um `registro` são verificados quanto a tipo, vetor e duplicidade em um escopo próprio do registro. A especificação não fornece sintaxe para instanciar ou acessar campos de registros, portanto nenhuma operação adicional sobre registros foi inventada.
 
 ## Novas ambiguidades encontradas
 

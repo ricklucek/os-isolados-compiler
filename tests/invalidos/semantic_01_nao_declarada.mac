@@ -1,0 +1,6 @@
+inteira principal() @
+[
+    x receba 1;
+    inteira x;
+    respost x;
+]

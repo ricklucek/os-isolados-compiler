@@ -1,0 +1,10 @@
+outrafuncao inteira calcula(inteira valor) @
+[
+    inteira dobro;
+    dobro receba valor * 2;
+]
+
+inteira principal() @
+[
+    respost 0;
+]

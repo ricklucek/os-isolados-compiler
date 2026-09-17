@@ -1,11 +1,22 @@
 #ifndef SEMANTIC_H
 #define SEMANTIC_H
 
-/*
- * Checkpoint 4:
- * Responsável por tabela de símbolos, escopos e verificação de tipos.
- */
+#include <stddef.h>
+#include <stdio.h>
 
-void semantic_module_placeholder(void);
+#include "ast.h"
+
+typedef enum {
+    SEMANTIC_OK = 0,
+    SEMANTIC_HAS_ERRORS = 1,
+    SEMANTIC_MEMORY_ERROR = 2
+} SemanticStatus;
+
+typedef struct {
+    SemanticStatus status;
+    size_t error_count;
+} SemanticResult;
+
+SemanticResult semantic_analyze(const AstNode *ast, FILE *error_stream);
 
 #endif

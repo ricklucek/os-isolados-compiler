@@ -1,0 +1,8 @@
+inteira principal() @
+[
+    inteira numero;
+    bool ativo;
+    ativo receba VER;
+    numero receba ativo;
+    respost numero;
+]
