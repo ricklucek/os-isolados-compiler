@@ -44,11 +44,15 @@ respost;
 
 ## D05 — Localização de erros
 
-Tokens armazenam linha e coluna. Lexer e parser usam esses dados nos diagnósticos.
+Tokens armazenam linha e coluna. Lexer, parser e nós da AST preservam esses dados para diagnósticos precisos.
 
 ## D06 — AST
 
-O parser será conectado a uma AST no Checkpoint 3. O Checkpoint 2 valida a estrutura sintática sem ainda construir a representação intermediária.
+**Status: implementada.**
+
+O parser constrói uma AST durante a análise sintática. A árvore é entregue somente quando não existem erros sintáticos; árvores parciais são liberadas. Os nós mantêm tipo estrutural (`AstNodeKind`), token relacionado, lexema quando aplicável, linha/coluna e uma lista dinâmica de filhos.
+
+A AST passa a ser a representação de entrada do analisador semântico do Checkpoint 4.
 
 ## D07 — Palavras estruturais ausentes da lista de reservadas
 
@@ -135,6 +139,20 @@ CONDIÇÃO -> NUM COMPARADOR NUM
 ```
 
 O parser não amplia essa produção para uma expressão booleana arbitrária. Operadores `OU`, `E`, `NÃO` e `XOR` continuam disponíveis em expressões gerais, mas uma condição de `cond`, `durante` ou `repete` deve seguir a forma explícita acima.
+
+## D18 — Representação de declarações na AST
+
+**Status: adotada.**
+
+Declarações com vários nomes, como `inteira a, b;`, são representadas por um único nó `VAR_DECL` com um filho `IDENTIFIER` para cada nome. Declarações de vetor usam `VECTOR_DECL`; o primeiro filho guarda o tamanho e os demais guardam os identificadores.
+
+Essa forma mantém na árvore a associação de todos os declaradores ao mesmo tipo e evita duplicar informação sintática.
+
+## D19 — AST somente após sucesso sintático
+
+**Status: adotada.**
+
+O parser pode continuar recuperando-se de erros para produzir múltiplos diagnósticos, mas uma AST parcial nunca segue para a análise semântica. Se `error_count > 0`, toda a árvore construída é liberada.
 
 ## Novas ambiguidades encontradas
 

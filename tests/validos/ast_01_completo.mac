@@ -1,0 +1,27 @@
+outrafuncao inteira soma(inteira a, inteira b) @
+[
+    inteira resultado;
+    resultado receba a + b * 2;
+    respost resultado;
+]
+
+inteira principal() @
+[
+    inteira vet{3} numeros;
+    inteira i;
+    i receba 0;
+
+    repete ( i receba 0 , i < 3 , i receba i + 1 ) edai
+    [
+        numeros{i} receba soma(i, 1);
+    ]
+
+    cond ( i == 3 ) edai
+    [
+        respost raiz(9);
+    ]
+    casocontrario edai
+    [
+        respost 0;
+    ]
+]
