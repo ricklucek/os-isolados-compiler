@@ -43,6 +43,43 @@ O projeto é compilado normalmente com:
 -std=c99 -Wall -Wextra -pedantic
 ```
 
+
+## Ambiente Docker padronizado
+
+O repositório inclui `Dockerfile` e `docker-compose.yaml` para que o grupo use a mesma toolchain. O código-fonte permanece montado por bind mount em `/usr/src/app`, portanto alterações feitas no host aparecem imediatamente dentro do container, sem reconstruir a imagem.
+
+Construir o ambiente:
+
+```bash
+docker compose build
+```
+
+Abrir um shell de desenvolvimento:
+
+```bash
+docker compose run --rm dev
+```
+
+Executar a validação completa no ambiente padronizado:
+
+```bash
+make docker-test
+```
+
+Executar os sanitizers no ambiente Docker:
+
+```bash
+make docker-sanitize
+```
+
+Para recompilar e testar automaticamente sempre que um arquivo `.c` ou `.h` mudar:
+
+```bash
+make watch
+```
+
+A imagem de desenvolvimento usa Debian 12 com GCC, `make`, `entr` e os runtimes de AddressSanitizer/UndefinedBehaviorSanitizer. O arquivo `.gitattributes` força finais de linha LF nos scripts e fontes relevantes, inclusive quando o repositório é usado em Windows.
+
 ## Execução
 
 Pipeline completo — léxico, sintático, AST e semântico:

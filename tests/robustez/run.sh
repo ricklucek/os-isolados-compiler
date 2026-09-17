@@ -1,4 +1,5 @@
 #!/bin/sh
+# POSIX sh; .gitattributes forca LF para evitar CRLF em bind mounts do Windows.
 
 set -u
 
