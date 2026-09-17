@@ -1,0 +1,14 @@
+# Binários e objetos C
+*.o
+macaronica
+*.exe
+
+# IDE / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporários
+*.log
+*.tmp
