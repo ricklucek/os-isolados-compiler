@@ -1,0 +1,20 @@
+outrafuncao inteira soma(inteira a, inteira b) @
+[
+    respost a + b;
+]
+
+inteira principal() @
+[
+    inteira numero;
+    flut metade;
+    inteira vet{3} numeros;
+    numero receba soma(2, 3);
+    metade receba numero / 2;
+    numeros{0} receba numero;
+    cond ( numero > 0 ) edai
+    [
+        inteira temporario;
+        temporario receba numero;
+    ]
+    respost numero;
+]

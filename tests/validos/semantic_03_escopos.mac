@@ -1,0 +1,11 @@
+inteira principal() @
+[
+    inteira x;
+    x receba 1;
+    cond ( x > 0 ) edai
+    [
+        inteira x;
+        x receba 2;
+    ]
+    respost x;
+]

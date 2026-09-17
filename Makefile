@@ -4,7 +4,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser test-ast
+.PHONY: all clean run test test-lexer test-parser test-ast test-semantic
 
 all: $(TARGET)
 
@@ -17,7 +17,7 @@ src/%.o: src/%.c
 run: $(TARGET)
 	./$(TARGET) examples/exemplo_minimo.mac
 
-test: test-lexer test-parser test-ast
+test: test-lexer test-parser test-ast test-semantic
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -39,12 +39,12 @@ test-parser: $(TARGET)
 	@echo "== Casos sintaticos validos =="
 	@set -e; for file in tests/validos/parser_*.mac; do \
 		echo "[OK esperado] $$file"; \
-		./$(TARGET) "$$file" >/dev/null; \
+		./$(TARGET) "$$file" --parser-only >/dev/null; \
 	done
 	@echo "== Casos sintaticos invalidos =="
 	@set -e; for file in tests/invalidos/parser_*.mac; do \
 		echo "[ERRO esperado] $$file"; \
-		if ./$(TARGET) "$$file" >/dev/null 2>&1; then \
+		if ./$(TARGET) "$$file" --parser-only >/dev/null 2>&1; then \
 			echo "FALHA: $$file deveria ter sido rejeitado pelo parser."; \
 			exit 1; \
 		fi; \
@@ -53,7 +53,7 @@ test-parser: $(TARGET)
 
 test-ast: $(TARGET)
 	@echo "== Construcao e estrutura da AST =="
-	@./$(TARGET) tests/validos/ast_01_completo.mac --ast > .ast-test.out
+	@./$(TARGET) tests/validos/ast_01_completo.mac --parser-only --ast > .ast-test.out
 	@grep -q "PROGRAM" .ast-test.out
 	@grep -q "FUNCTION" .ast-test.out
 	@grep -q "PRINCIPAL" .ast-test.out
@@ -64,6 +64,22 @@ test-ast: $(TARGET)
 	@grep -q "BINARY_EXPR" .ast-test.out
 	@rm -f .ast-test.out
 	@echo "AST construida com os nos estruturais esperados."
+
+test-semantic: $(TARGET)
+	@echo "== Casos semanticamente validos =="
+	@set -e; for file in tests/validos/semantic_*.mac; do \
+		echo "[OK esperado] $$file"; \
+		./$(TARGET) "$$file" >/dev/null; \
+	done
+	@echo "== Casos semanticamente invalidos =="
+	@set -e; for file in tests/invalidos/semantic_*.mac; do \
+		echo "[ERRO esperado] $$file"; \
+		if ./$(TARGET) "$$file" >/dev/null 2>&1; then \
+			echo "FALHA: $$file deveria ter sido rejeitado pelo analisador semantico."; \
+			exit 1; \
+		fi; \
+	done
+	@echo "Todos os testes semanticos passaram."
 
 clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out

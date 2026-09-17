@@ -1,0 +1,11 @@
+outrafuncao inteira converte(inteira valor) @
+[
+    respost valor;
+]
+
+inteira principal() @
+[
+    bool ativo;
+    ativo receba VER;
+    respost converte(ativo);
+]

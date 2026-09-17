@@ -1,0 +1,11 @@
+inteira principal() @
+[
+    inteira resultado;
+    resultado receba dobrar(4);
+    respost resultado;
+]
+
+outrafuncao inteira dobrar(inteira valor) @
+[
+    respost valor * 2;
+]

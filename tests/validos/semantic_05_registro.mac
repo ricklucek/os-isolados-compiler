@@ -1,0 +1,10 @@
+registro Pessoa @
+[
+    inteira idade;
+    bool ativo;
+]
+
+inteira principal() @
+[
+    respost 0;
+]
