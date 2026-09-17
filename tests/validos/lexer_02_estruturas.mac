@@ -1,0 +1,19 @@
+registro Pessoa @
+[
+    inteira idade;
+]
+
+outrafuncao bool compara(inteira a, inteira b) @
+[
+    bool resultado;
+    resultado receba VER;
+    cond ( a < b ) edai
+    [
+        resultado receba FAL;
+    ]
+    casocontrario edai
+    [
+        resultado receba VER;
+    ]
+    respost resultado;
+]

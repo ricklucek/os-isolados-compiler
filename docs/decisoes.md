@@ -10,89 +10,82 @@ A disciplina é Linguagens Formais e Compiladores; portanto, o grupo implementar
 
 **Status:** proposta inicial, deve ser validada pelo grupo antes do parser.
 
-A especificação define `tipo vet{tamanho} nome`, mas não define explicitamente a sintaxe de acesso. A proposta inicial é:
-
-```text
-nome{indice}
-```
-
-Justificativa: reutiliza o delimitador já associado a vetores na linguagem e mantém a sintaxe distinguível de chamada de função.
+A especificação define `tipo vet{tamanho} nome`, mas não define explicitamente a sintaxe de acesso. A proposta inicial é `nome{indice}`.
 
 ## D03 — Chamada de função
 
 **Status:** proposta inicial.
 
-A chamada de função seguirá:
-
-```text
-nome(argumento1, argumento2, ...)
-```
-
-Justificativa: é a convenção natural indicada pelo próprio enunciado.
+A chamada seguirá `nome(argumento1, argumento2, ...)`, conforme a convenção natural indicada no enunciado.
 
 ## D04 — Retorno em função `vazio`
 
 **Status:** proposta inicial.
 
-Funções de retorno `vazio` poderão omitir `respost`. Caso seja utilizado, será aceito apenas:
-
-```text
-respost;
-```
-
-Nunca `respost valor;`.
+Funções `vazio` poderão omitir `respost`. Caso utilizado, será aceito `respost;`, nunca `respost valor;`.
 
 ## D05 — Localização de erros
 
-Tokens guardarão, no mínimo, linha e coluna para permitir mensagens de erro precisas.
+**Status:** consolidada no Checkpoint 1.
+
+Cada token guarda linha e coluna inicial. O lexer mantém essas posições durante a varredura e as mensagens de erro léxico indicam ambas.
 
 ## D06 — AST
 
-O parser produzirá uma AST para separar a análise sintática da análise semântica e facilitar inspeção, testes e explicação do projeto.
+O parser produzirá uma AST para separar análise sintática de análise semântica e facilitar inspeção, testes e explicação do projeto.
 
 ## D07 — Palavras estruturais ausentes da lista de reservadas
 
-**Status:** pendente de consolidação no Checkpoint 1/2.
+**Status:** consolidada no Checkpoint 1.
 
-A lista de palavras reservadas fornecida pela especificação não contém `registro`, `outrafuncao` e `edai`, embora essas palavras apareçam nas formas sintáticas das estruturas da linguagem.
+`registro`, `outrafuncao`, `edai` e `vet` aparecem nas formas sintáticas, embora não estejam na lista explícita de palavras reservadas.
 
-Decisão provisória: o lexer deverá reconhecê-las como palavras estruturais da Macaronica, pois sem isso as construções apresentadas no próprio enunciado não poderiam ser analisadas. A diferença será explicitamente mantida na documentação como inconsistência da especificação.
+**Decisão:** o lexer reconhece os quatro como palavras estruturais específicas.
 
 ## D08 — Símbolos usados nas estruturas, mas ausentes do alfabeto
 
-**Status:** pendente de consolidação no Checkpoint 1.
+**Status:** parcialmente consolidada no Checkpoint 1.
 
-O alfabeto listado não inclui `@` nem `,`, mas ambos aparecem nas estruturas e exemplos da linguagem. Também não define aspas para literais de `palavra`.
+`@` e `,` não aparecem no alfabeto listado, mas aparecem nas estruturas e exemplos.
 
-Decisão provisória: `@` e `,` serão reconhecidos porque são exigidos pelas estruturas fornecidas. A sintaxe de literal textual será tratada como lacuna separada e não será assumida silenciosamente.
+**Decisão:** ambos são reconhecidos como tokens. Aspas para literais de `palavra` continuam pendentes.
 
 ## D09 — Operador lógico `NÃO` e alfabeto ASCII
 
-**Status:** pendente de consolidação no Checkpoint 1.
+**Status:** consolidada no Checkpoint 1.
 
-A tabela de operadores usa `NÃO`, mas o alfabeto apresentado contém apenas `a..z` e `A..Z`, criando uma inconsistência em relação ao caractere acentuado.
-
-Antes de fechar a regra léxica, o grupo deve escolher entre aceitar literalmente `NÃO`, definir uma forma ASCII (`NAO`) ou aceitar ambas, registrando a escolha e sua justificativa.
+**Decisão:** aceitar literalmente `NÃO` em UTF-8 e não criar o alias `NAO`, preservando o lexema fornecido pela especificação.
 
 ## D10 — Entrada e saída na Macaronica
 
 **Status:** pendente de decisão.
 
-Os casos de teste obrigatórios pedem ao menos um uso de entrada/saída, mas a seção específica da Macaronica não fornece uma construção de leitura ou impressão.
-
-A sintaxe não será inventada sem registro. O grupo deve definir uma convenção razoável ou confirmar com o professor antes de fechar a gramática e os testes obrigatórios.
+Os casos de teste obrigatórios pedem uso de entrada/saída, mas a seção da Macaronica não fornece uma construção de leitura ou impressão. A sintaxe não será inventada sem registro; o grupo deverá consolidar uma convenção ou confirmar com o professor antes de fechar a gramática.
 
 ## D11 — Literal do tipo `palavra`
 
 **Status:** pendente de decisão.
 
-O tipo `palavra` é definido, mas a especificação apresentada não formaliza a sintaxe de um literal textual. Essa lacuna afeta o lexer, a gramática e a verificação de tipos e será resolvida explicitamente antes da consolidação dessas fases.
+O tipo `palavra` é definido, mas a especificação não formaliza a sintaxe de literal textual e aspas não aparecem no alfabeto. O Checkpoint 1 não reconhece literal textual.
+
+## D12 — Literais de `flut` e `duplocarpado`
+
+**Status:** consolidada no Checkpoint 1.
+
+**Decisão:** adotar `DIGITO+ '.' DIGITO+` para literais reais. O ponto somente é aceito dentro desse padrão e não existe como token isolado.
+
+## D13 — Identificadores
+
+**Status:** consolidada no Checkpoint 1.
+
+Identificadores seguem `LETRA (LETRA | DIGITO)*`, usando apenas `a..z`, `A..Z` e `0..9`. `_` não é aceito porque não consta no alfabeto fornecido.
+
+## D14 — Comentários
+
+**Status:** pendente.
+
+A especificação não define comentários. O lexer não interpreta `//` como comentário porque esse lexema é explicitamente definido como operador de divisão inteira.
 
 ## Novas ambiguidades encontradas
 
-Registrar aqui qualquer lacuna adicional identificada durante a implementação, sempre contendo:
-
-- descrição;
-- decisão;
-- justificativa;
-- impacto na gramática ou semântica.
+Toda nova lacuna deve ser registrada com descrição, decisão, justificativa e impacto na gramática ou semântica.
