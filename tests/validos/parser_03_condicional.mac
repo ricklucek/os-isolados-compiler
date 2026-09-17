@@ -1,0 +1,17 @@
+inteira principal() @
+[
+    inteira resultado;
+    resultado receba 25;
+    cond ( resultado > 20 ) edai
+    [
+        respost 1;
+    ]
+    casocontrario cond ( resultado == 20 ) edai
+    [
+        respost 2;
+    ]
+    casocontrario edai
+    [
+        respost 0;
+    ]
+]

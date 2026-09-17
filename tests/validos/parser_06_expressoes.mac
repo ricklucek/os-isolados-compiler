@@ -1,0 +1,13 @@
+outrafuncao flut calcula(flut a, flut b) @
+[
+    respost raiz(a ^ 2 + b ^ 2) / 2;
+]
+
+inteira principal() @
+[
+    bool ativo;
+    flut valor;
+    ativo receba VER E NÃO FAL;
+    valor receba calcula(3.0, 4.0);
+    respost 0;
+]

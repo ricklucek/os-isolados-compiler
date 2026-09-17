@@ -1,0 +1,10 @@
+inteira principal() @
+[
+    inteira x;
+    x receba 0;
+    durante ( x < 10 )
+    [
+        x receba x + 1;
+    ]
+    respost x;
+]

@@ -1,0 +1,4 @@
+outrafuncao inteira soma(inteira a, b) @
+[
+    respost a + b;
+]

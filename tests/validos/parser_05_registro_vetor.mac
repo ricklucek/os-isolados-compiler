@@ -1,0 +1,13 @@
+registro Pessoa @
+[
+    inteira idade;
+    flut altura;
+]
+
+inteira principal() @
+[
+    inteira vet{10} numeros;
+    numeros{0} receba 1;
+    numeros{1} receba numeros{0} + 2;
+    respost numeros{1};
+]

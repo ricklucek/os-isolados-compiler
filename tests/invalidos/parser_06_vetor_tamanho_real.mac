@@ -1,0 +1,5 @@
+inteira principal() @
+[
+    inteira vet{10.5} numeros;
+    respost 0;
+]
