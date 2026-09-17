@@ -1,0 +1,6 @@
+inteira principal() @
+[
+    inteira numero;
+    numero receba 25;
+    respost numero;
+]
