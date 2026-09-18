@@ -126,6 +126,12 @@ Exemplo padrão:
 make run
 ```
 
+Demonstração completa com fluxo de tokens e AST:
+
+```bash
+make demo
+```
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -239,8 +245,21 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 3 — AST — concluído
 - Checkpoint 4 — analisador semântico e tabela de símbolos — concluído
 - Checkpoint 5 — tratamento de erros e robustez — concluído
-- Checkpoint 6 — testes e documentação final — concluído nesta entrega
-- Checkpoint 7 — roteiro de estudo e defesa do código
+- Checkpoint 6 — testes e documentação final — concluído
+- Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído nesta entrega
+
+
+## Material de estudo e apresentação
+
+O Checkpoint 7 adiciona material específico para a defesa do trabalho:
+
+- `docs/roteiro-estudo.md`: explicação completa do compilador, fase por fase;
+- `docs/mapa-codigo.md`: caminho entre conceitos, arquivos, estruturas e funções;
+- `docs/perguntas-arguicao.md`: checklist de perguntas com respostas esperadas;
+- `docs/roteiro-apresentacao.md`: sequência sugerida para a apresentação e demonstração;
+- `docs/auditoria-rubrica.md`: mapeamento entre a implementação e os critérios da rubrica.
+
+O objetivo não é decorar respostas, mas conseguir reconstruir o raciocínio do projeto a partir do código.
 
 ## Uso de IA generativa
 
