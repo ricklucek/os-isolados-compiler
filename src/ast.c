@@ -96,6 +96,7 @@ const char *ast_node_kind_name(AstNodeKind kind) {
         case AST_IDENTIFIER: return "IDENTIFIER";
         case AST_INTEGER_LITERAL: return "INTEGER_LITERAL";
         case AST_REAL_LITERAL: return "REAL_LITERAL";
+        case AST_STRING_LITERAL: return "STRING_LITERAL";
         case AST_BOOL_LITERAL: return "BOOL_LITERAL";
         case AST_BINARY_EXPR: return "BINARY_EXPR";
         case AST_UNARY_EXPR: return "UNARY_EXPR";

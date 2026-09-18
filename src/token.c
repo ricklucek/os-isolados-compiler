@@ -60,6 +60,7 @@ const char *token_type_name(TokenType type) {
         case TOKEN_IDENTIFIER: return "IDENTIFIER";
         case TOKEN_INTEGER_LITERAL: return "INTEGER_LITERAL";
         case TOKEN_REAL_LITERAL: return "REAL_LITERAL";
+        case TOKEN_STRING_LITERAL: return "STRING_LITERAL";
         case TOKEN_RECEBA: return "RECEBA";
         case TOKEN_REPETE: return "REPETE";
         case TOKEN_DURANTE: return "DURANTE";

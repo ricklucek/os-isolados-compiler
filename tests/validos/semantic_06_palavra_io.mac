@@ -1,0 +1,10 @@
+inteira principal() @
+[
+    palavra mensagem;
+    inteira numero;
+    mensagem receba "Digite um numero";
+    saida(mensagem);
+    entrada(numero);
+    saida(numero);
+    respost 0;
+]

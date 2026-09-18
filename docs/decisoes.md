@@ -74,15 +74,28 @@ O lexer aceita literalmente `NÃO` em UTF-8, como escrito na tabela da linguagem
 
 ## D10 — Entrada e saída na Macaronica
 
-**Status: pendente.**
+**Status: adotada para a entrega.**
 
-Os casos obrigatórios pedem entrada/saída, mas a seção da Macaronica não fornece comandos correspondentes. Essa sintaxe não será inventada sem registro; deverá ser definida antes dos testes finais ou confirmada com o professor.
+Os casos obrigatórios pedem ao menos um uso de entrada/saída, mas a seção da Macaronica não fornece uma construção correspondente. Para resolver a lacuna sem adicionar novas palavras reservadas ao lexer, foram adotadas duas operações embutidas com a mesma sintaxe de chamada de função já escolhida pelo grupo:
+
+```text
+entrada(destino);
+saida(expressao);
+```
+
+`entrada` exige exatamente um destino atribuível (variável, parâmetro ou posição de vetor). `saida` exige exatamente uma expressão de tipo não-`vazio`. Ambas são verificadas semanticamente e possuem resultado `vazio`. Os nomes `entrada` e `saida` ficam reservados semanticamente e não podem ser redeclarados pelo programa.
 
 ## D11 — Literal do tipo `palavra`
 
-**Status: pendente.**
+**Status: adotada para a entrega.**
 
-O tipo `palavra` existe, mas a especificação não formaliza literal textual. Por isso, strings ainda não fazem parte do lexer/parser.
+O tipo `palavra` existe, mas a especificação não formaliza uma sintaxe de literal textual. Foi adotada a forma convencional entre aspas duplas:
+
+```text
+"texto"
+```
+
+O lexer gera `STRING_LITERAL`, o parser gera `STRING_LITERAL` na AST e a análise semântica atribui o tipo `palavra`. Um literal não pode atravessar uma quebra de linha e uma aspa de fechamento ausente gera erro léxico. Não foi inventada uma sintaxe de escapes neste trabalho.
 
 ## D12 — `func` versus `outrafuncao`
 
@@ -201,6 +214,18 @@ Funções não-`vazio` devem possuir ao menos um `respost` e cada retorno deve s
 **Status: adotada parcialmente.**
 
 Campos declarados dentro de um `registro` são verificados quanto a tipo, vetor e duplicidade em um escopo próprio do registro. A especificação não fornece sintaxe para instanciar ou acessar campos de registros, portanto nenhuma operação adicional sobre registros foi inventada.
+
+## D27 — Comentários
+
+**Status: não implementados por ausência de especificação.**
+
+A rubrica menciona comentários como exemplo de robustez léxica, mas a especificação da Macaronica não define delimitadores de comentário. Além disso, `//` já é operador de divisão inteira. O grupo optou por não inventar uma sintaxe de comentários que alteraria o vocabulário da linguagem.
+
+## D28 — Operações embutidas de E/S não executam I/O
+
+**Status: adotada.**
+
+O escopo do trabalho termina na validação semântica e não exige execução do programa. Portanto, `entrada(...)` e `saida(...)` são construções semanticamente validadas, mas não leem do teclado nem imprimem valores durante a execução do compilador.
 
 ## Novas ambiguidades encontradas
 

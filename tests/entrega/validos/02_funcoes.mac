@@ -1,0 +1,12 @@
+outrafuncao flut media(inteira a, inteira b) @
+[
+    respost ( a + b ) / 2;
+]
+
+inteira principal() @
+[
+    flut resultado;
+    resultado receba media(10, 20);
+    saida(resultado);
+    respost 0;
+]

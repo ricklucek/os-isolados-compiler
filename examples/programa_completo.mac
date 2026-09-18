@@ -1,0 +1,39 @@
+registro Pessoa @
+[
+    palavra nome;
+    inteira idade;
+]
+
+outrafuncao inteira dobro(inteira valor) @
+[
+    respost valor * 2;
+]
+
+inteira principal() @
+[
+    inteira numero;
+    inteira i;
+    inteira vet{3} valores;
+    palavra mensagem;
+    mensagem receba "inicio";
+    saida(mensagem);
+    entrada(numero);
+    valores{0} receba dobro(numero);
+    cond ( numero > 0 ) edai
+    [
+        saida(numero);
+    ]
+    casocontrario edai
+    [
+        saida(0);
+    ]
+    repete ( i receba 0, i < 3, i receba i + 1 ) edai
+    [
+        valores{i} receba i;
+    ]
+    durante ( i > 0 ) edai
+    [
+        i receba i - 1;
+    ]
+    respost 0;
+]

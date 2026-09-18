@@ -1,0 +1,6 @@
+inteira principal() @
+[
+    inteira numero;
+    numero receba "texto";
+    respost 0;
+]

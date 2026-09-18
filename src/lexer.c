@@ -120,6 +120,32 @@ static int scan_number(Lexer *lexer) {
     return lexer_add_token(lexer, type, start, lexer->current - start, line, column);
 }
 
+static int scan_string(Lexer *lexer) {
+    size_t start = lexer->current;
+    int line = lexer->line, column = lexer->column;
+
+    lexer_advance(lexer);
+
+    while (!lexer_is_at_end(lexer) && lexer_peek(lexer) != '"' &&
+           lexer_peek(lexer) != '\n' && lexer_peek(lexer) != '\r') {
+        lexer_advance(lexer);
+    }
+
+    if (lexer_is_at_end(lexer) || lexer_peek(lexer) == '\n' ||
+        lexer_peek(lexer) == '\r') {
+        fprintf(lexer->error_stream,
+                "[ERRO LEXICO] linha %d, coluna %d: literal de palavra nao terminado; esperado fechamento com aspas duplas.\n",
+                line, column);
+        ++lexer->lexical_errors;
+        return lexer_add_token(lexer, TOKEN_INVALID, start,
+                               lexer->current - start, line, column);
+    }
+
+    lexer_advance(lexer);
+    return lexer_add_token(lexer, TOKEN_STRING_LITERAL, start,
+                           lexer->current - start, line, column);
+}
+
 static void report_invalid_char(Lexer *lexer, unsigned char c, int line, int column) {
     if (c >= 32U && c <= 126U)
         fprintf(lexer->error_stream,
@@ -189,6 +215,10 @@ static LexerStatus scan_source(const char *source, size_t length,
         char c = lexer_peek(&lexer);
         if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
             lexer_advance(&lexer);
+            continue;
+        }
+        if (c == '"') {
+            if (!scan_string(&lexer)) return LEXER_MEMORY_ERROR;
             continue;
         }
         if (starts_with_nao(&lexer)) {

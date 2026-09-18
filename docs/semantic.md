@@ -66,6 +66,7 @@ Literais são tipados assim:
 ```text
 INTEGER_LITERAL -> inteira
 REAL_LITERAL    -> flut
+STRING_LITERAL  -> palavra
 VER / FAL       -> bool
 ```
 
@@ -140,3 +141,26 @@ Função com retorno diferente de `vazio` deve possuir ao menos um `respost` com
 O analisador não encerra no primeiro erro semântico. Sempre que a AST permite continuar com segurança, a travessia prossegue e novos diagnósticos são produzidos com linha e coluna.
 
 Erros léxicos ou sintáticos continuam impedindo a execução da fase semântica, pois nesses casos não existe uma AST válida para analisar.
+
+
+## 11. Entrada e saída embutidas
+
+Para atender ao requisito de teste de entrada/saída diante da ausência de sintaxe correspondente na especificação da Macaronica, o grupo definiu duas chamadas embutidas:
+
+```text
+entrada(destino);
+saida(expressao);
+```
+
+As duas usam a sintaxe normal de chamada de função e, por isso, `entrada` e `saida` continuam sendo identificadores no lexer e nós `CALL` na AST.
+
+Regras:
+
+- `entrada` recebe exatamente um argumento;
+- o argumento de `entrada` deve ser um destino atribuível: variável, parâmetro ou acesso a vetor;
+- `saida` recebe exatamente uma expressão;
+- a expressão de `saida` pode ser `bool`, `inteira`, `flut`, `palavra` ou `duplocarpado`, mas não `vazio`;
+- ambas possuem tipo de resultado `vazio`;
+- os nomes `entrada` e `saida` são reservados semanticamente e não podem ser declarados pelo programa.
+
+Essas operações são apenas validadas. O compilador não executa o programa de entrada, portanto nenhuma leitura ou escrita real é realizada.
