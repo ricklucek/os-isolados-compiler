@@ -5,7 +5,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness test-delivery sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo test test-lexer test-parser test-ast test-semantic test-robustness test-delivery sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -17,6 +17,9 @@ src/%.o: src/%.c
 
 run: $(TARGET)
 	./$(TARGET) examples/exemplo_minimo.mac
+
+demo: $(TARGET)
+	./$(TARGET) examples/programa_completo.mac --tokens --ast
 
 test: test-lexer test-parser test-ast test-semantic test-robustness test-delivery
 

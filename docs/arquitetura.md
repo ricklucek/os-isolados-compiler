@@ -45,7 +45,7 @@ Percorre a AST e verifica declaração/uso, tipos, vetores, chamadas de função
 Implementa tabela de símbolos com escopo global, escopos de função e escopos aninhados. Armazena categoria, tipo, localização da declaração, tamanho de vetores e assinatura de funções.
 
 ### `errors.c/.h`
-Reserva o ponto de integração para infraestrutura compartilhada de diagnósticos. Atualmente cada fase mantém sua mensagem especializada, sempre usando as posições fornecidas pelos tokens/AST.
+Centraliza o contrato de saída do compilador: nomes das fases, códigos de saída e resumos de sucesso/falha. Os diagnósticos detalhados continuam sendo produzidos pela fase que possui o contexto necessário, sempre usando as posições preservadas em tokens e nós da AST.
 
 ### `main.c`
 Orquestra o pipeline e interrompe as fases posteriores quando uma fase anterior não produz representação válida.
