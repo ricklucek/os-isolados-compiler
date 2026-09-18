@@ -5,7 +5,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness sanitize test-sanitize
+.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -95,6 +95,23 @@ test-sanitize: sanitize
 	@ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
 		UBSAN_OPTIONS=halt_on_error=1 \
 		sh tests/robustez/run.sh ./$(TARGET)
+
+watch:
+	@command -v entr >/dev/null 2>&1 || { echo "Erro: 'entr' nao esta instalado."; exit 1; }
+	@find src -type f \( -name '*.c' -o -name '*.h' \) | \
+		entr -r sh -c 'make clean && make && make test'
+
+docker-build:
+	docker compose build
+
+docker-shell:
+	docker compose run --rm dev
+
+docker-test:
+	docker compose run --rm dev sh -lc 'make clean && make && make test'
+
+docker-sanitize:
+	docker compose run --rm dev sh -lc 'make test-sanitize'
 
 clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .robustness-test.out .robustness-test.err

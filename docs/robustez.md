@@ -104,3 +104,22 @@ make test-sanitize
 também conclui sem erros de memória ou comportamento indefinido.
 
 A exigência principal é que nenhuma entrada inválida produza `segmentation fault`, aborto inesperado ou loop infinito; ela deve resultar em diagnóstico e código de saída controlado.
+
+
+## 7. Ambiente Docker e finais de linha
+
+O ambiente de desenvolvimento padronizado usa `Dockerfile` + `docker-compose.yaml` com bind mount do repositório em `/usr/src/app`.
+
+O script `tests/robustez/run.sh` é POSIX `sh`. Como o projeto pode ser clonado em Windows e montado em um container Linux, `.gitattributes` força `eol=lf` para arquivos `.sh`, fontes, `Makefile`, `Dockerfile` e YAML. Isso evita que caracteres `CR` de CRLF sejam interpretados pelo BusyBox/Dash como parte dos comandos.
+
+A imagem Docker usa Debian 12 em vez do Alpine 3.18 usado durante a validação inicial do grupo. O motivo é tornar `make test-sanitize` reproduzível: a imagem instala explicitamente os runtimes `libasan8` e `libubsan1`, necessários para linkar AddressSanitizer e UndefinedBehaviorSanitizer.
+
+Comandos recomendados:
+
+```bash
+docker compose build
+make docker-test
+make docker-sanitize
+```
+
+O bind mount mantém o código do host e do container sincronizado; reconstruir a imagem só é necessário quando o próprio Dockerfile ou suas dependências mudarem.

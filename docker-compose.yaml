@@ -1,0 +1,11 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: os-isolados-compiler-dev
+    working_dir: /usr/src/app
+    volumes:
+      - .:/usr/src/app
+    stdin_open: true
+    tty: true

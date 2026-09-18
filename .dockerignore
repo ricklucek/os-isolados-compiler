@@ -1,0 +1,7 @@
+.git
+.gitignore
+*.o
+macaronica
+.ast-test.out
+.robustness-test.out
+.robustness-test.err
