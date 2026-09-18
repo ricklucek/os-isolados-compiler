@@ -134,7 +134,7 @@ static int scan_string(Lexer *lexer) {
     if (lexer_is_at_end(lexer) || lexer_peek(lexer) == '\n' ||
         lexer_peek(lexer) == '\r') {
         fprintf(lexer->error_stream,
-                "[ERRO LEXICO] linha %d, coluna %d: literal de palavra nao terminado; esperado '"'.\n",
+                "[ERRO LEXICO] linha %d, coluna %d: literal de palavra nao terminado; esperado fechamento com aspas duplas.\n",
                 line, column);
         ++lexer->lexical_errors;
         return lexer_add_token(lexer, TOKEN_INVALID, start,
