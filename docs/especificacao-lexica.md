@@ -77,16 +77,28 @@ REAL    = DIGITO+ '.' DIGITO+
 
 O ponto `.` não é aceito isoladamente. O sinal negativo não faz parte do literal: `-10` é tokenizado como `MINUS` seguido de `INTEGER_LITERAL`; a interpretação como operador unário será responsabilidade do parser.
 
-## 8. Espaços, posição e erros
+## 8. Literal do tipo `palavra`
+
+Como a especificação define o tipo `palavra`, mas não define a sintaxe de literal textual, foi adotado:
+
+```text
+STRING = '"' { caractere_exceto_quebra_de_linha_e_aspa } '"'
+```
+
+Exemplo:
+
+```text
+"Macaronica"
+```
+
+O token gerado é `STRING_LITERAL`. A aspa de fechamento é obrigatória e o literal não pode atravessar uma quebra de linha. Não foi definida sintaxe de escapes, pois ela não aparece na especificação original.
+
+## 9. Espaços, posição e erros
 
 Espaços, tabulações, `\r` e `\n` separam lexemas e não geram tokens. Cada token registra a linha e a coluna de início. Quando encontra um caractere não definido, o lexer registra `TOKEN_INVALID`, informa linha e coluna, continua a varredura e retorna falha léxica ao final. Isso permite encontrar múltiplos erros em uma única execução.
 
-## 9. Lacunas ainda não resolvidas neste checkpoint
+## 10. Lacunas que permanecem sem sintaxe
 
-Não foram inventadas regras para os seguintes pontos ausentes da especificação:
+Comentários continuam sem implementação porque a especificação da Macaronica não fornece delimitadores e `//` já representa divisão inteira. A decisão está registrada em `docs/decisoes.md`.
 
-- literal textual do tipo `palavra`;
-- comentários;
-- comandos de entrada e saída.
-
-Esses itens permanecem registrados em `docs/decisoes.md` e deverão ser consolidados antes de fechar a gramática e os testes finais.
+Entrada e saída não exigem novos tokens: `entrada` e `saida` permanecem lexicalmente como `IDENTIFIER` e são reconhecidos como operações embutidas na análise semântica.

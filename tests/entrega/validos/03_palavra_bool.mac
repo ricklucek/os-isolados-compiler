@@ -1,0 +1,10 @@
+inteira principal() @
+[
+    palavra mensagem;
+    bool ativo;
+    mensagem receba "compiladores";
+    ativo receba VER;
+    saida(mensagem);
+    saida(ativo);
+    respost 0;
+]

@@ -362,6 +362,10 @@ static AstNode *parse_primary(Parser *parser) {
     if (token != NULL)
         return node_from_token(parser, AST_REAL_LITERAL, token);
 
+    token = match(parser, TOKEN_STRING_LITERAL);
+    if (token != NULL)
+        return node_from_token(parser, AST_STRING_LITERAL, token);
+
     token = match(parser, TOKEN_VER);
     if (token == NULL) token = match(parser, TOKEN_FAL);
     if (token != NULL)

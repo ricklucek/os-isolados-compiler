@@ -1,0 +1,11 @@
+outrafuncao vazio informar(palavra mensagem) @
+[
+    saida(mensagem);
+    respost;
+]
+
+inteira principal() @
+[
+    informar("ok");
+    respost 0;
+]

@@ -1,0 +1,16 @@
+inteira principal() @
+[
+    inteira i;
+    inteira vet{4} dados;
+    i receba 0;
+    dados{0} receba 10;
+
+    cond ( dados{0} > 0 ) edai
+    [
+        inteira interno;
+        interno receba dados{0};
+        saida(interno);
+    ]
+
+    respost 0;
+]

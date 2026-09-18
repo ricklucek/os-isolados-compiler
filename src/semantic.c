@@ -19,6 +19,8 @@ typedef struct {
 
 static LangType evaluate_expression(SemanticContext *context,
                                     const AstNode *node);
+static LangType evaluate_lvalue(SemanticContext *context,
+                                const AstNode *node);
 static void analyze_statement(SemanticContext *context, const AstNode *node);
 static void analyze_block(SemanticContext *context, const AstNode *block,
                           int create_scope, const char *scope_name);
@@ -62,6 +64,11 @@ static int enter_scope(SemanticContext *context, const char *name) {
     return 1;
 }
 
+static int is_builtin_io_name(const char *name) {
+    return name != NULL &&
+           (strcmp(name, "entrada") == 0 || strcmp(name, "saida") == 0);
+}
+
 static int declare_symbol(SemanticContext *context, const AstNode *node,
                           const char *name, SymbolKind kind, LangType type,
                           size_t vector_size, const LangType *parameter_types,
@@ -72,6 +79,13 @@ static int declare_symbol(SemanticContext *context, const AstNode *node,
     if (context->memory_error) return 0;
     if (name == NULL || name[0] == '\0') {
         semantic_error(context, node, "simbolo sem nome nao pode ser declarado");
+        return 0;
+    }
+
+    if (is_builtin_io_name(name)) {
+        semantic_error(context, node,
+                       "'%s' e reservado para a operacao embutida de entrada/saida",
+                       name);
         return 0;
     }
 
@@ -275,6 +289,41 @@ static LangType evaluate_call(SemanticContext *context, const AstNode *node) {
     size_t i;
 
     if (node == NULL) return LANG_TYPE_ERROR;
+
+    if (node->lexeme != NULL && strcmp(node->lexeme, "entrada") == 0) {
+        if (node->child_count != 1U) {
+            semantic_error(context, node,
+                           "entrada espera exatamente 1 destino, recebeu %zu",
+                           node->child_count);
+            for (i = 0U; i < node->child_count; ++i)
+                evaluate_expression(context, node->children[i]);
+            return LANG_TYPE_ERROR;
+        }
+        return evaluate_lvalue(context, node->children[0]) == LANG_TYPE_ERROR
+                   ? LANG_TYPE_ERROR
+                   : LANG_TYPE_VAZIO;
+    }
+
+    if (node->lexeme != NULL && strcmp(node->lexeme, "saida") == 0) {
+        LangType value_type;
+        if (node->child_count != 1U) {
+            semantic_error(context, node,
+                           "saida espera exatamente 1 expressao, recebeu %zu",
+                           node->child_count);
+            for (i = 0U; i < node->child_count; ++i)
+                evaluate_expression(context, node->children[i]);
+            return LANG_TYPE_ERROR;
+        }
+        value_type = evaluate_expression(context, node->children[0]);
+        if (value_type == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+        if (value_type == LANG_TYPE_VAZIO) {
+            semantic_error(context, node->children[0],
+                           "saida nao pode receber expressao do tipo vazio");
+            return LANG_TYPE_ERROR;
+        }
+        return LANG_TYPE_VAZIO;
+    }
+
     symbol = symbol_table_lookup(&context->symbols, node->lexeme);
 
     if (symbol == NULL) {
@@ -445,6 +494,7 @@ static LangType evaluate_expression(SemanticContext *context,
     switch (node->kind) {
         case AST_INTEGER_LITERAL: return LANG_TYPE_INTEIRA;
         case AST_REAL_LITERAL: return LANG_TYPE_FLUT;
+        case AST_STRING_LITERAL: return LANG_TYPE_PALAVRA;
         case AST_BOOL_LITERAL: return LANG_TYPE_BOOL;
         case AST_IDENTIFIER: return evaluate_identifier(context, node);
         case AST_VECTOR_ACCESS: return evaluate_vector_access(context, node);

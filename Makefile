@@ -5,7 +5,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run test test-lexer test-parser test-ast test-semantic test-robustness test-delivery sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -18,7 +18,7 @@ src/%.o: src/%.c
 run: $(TARGET)
 	./$(TARGET) examples/exemplo_minimo.mac
 
-test: test-lexer test-parser test-ast test-semantic test-robustness
+test: test-lexer test-parser test-ast test-semantic test-robustness test-delivery
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -85,6 +85,10 @@ test-semantic: $(TARGET)
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
 	@sh tests/robustez/run.sh ./$(TARGET)
+
+test-delivery: $(TARGET)
+	@echo "== Casos oficiais de entrega =="
+	@sh tests/entrega/run.sh ./$(TARGET)
 
 sanitize:
 	@$(MAKE) clean

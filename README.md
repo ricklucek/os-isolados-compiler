@@ -155,6 +155,7 @@ make test-parser
 make test-ast
 make test-semantic
 make test-robustness
+make test-delivery
 ```
 
 Para uma verificação opcional com AddressSanitizer e UndefinedBehaviorSanitizer:
@@ -164,6 +165,35 @@ make test-sanitize
 ```
 
 O alvo com sanitizers depende de suporte do compilador/plataforma e, por isso, não é executado automaticamente por `make test`.
+
+## Convenções finais da Macaronica
+
+Duas lacunas da especificação foram fechadas explicitamente para atender aos casos obrigatórios de entrega.
+
+Literal de `palavra`:
+
+```text
+"texto"
+```
+
+Entrada e saída:
+
+```text
+entrada(destino);
+saida(expressao);
+```
+
+Essas operações são validadas pelo front-end, mas não executadas, pois o escopo do trabalho termina na análise semântica. Todos os detalhes e justificativas estão em `docs/decisoes.md`.
+
+## Casos oficiais da entrega
+
+Além das suítes por fase, `tests/entrega/` contém cinco programas válidos e cinco inválidos organizados exatamente pelos tipos mínimos exigidos no enunciado. Para validar apenas esse conjunto:
+
+```bash
+make test-delivery
+```
+
+Há ainda `examples/programa_completo.mac`, que reúne em um único arquivo as principais estruturas da linguagem para demonstração.
 
 ## Limpeza
 
@@ -208,8 +238,8 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 2 — gramática e analisador sintático — concluído
 - Checkpoint 3 — AST — concluído
 - Checkpoint 4 — analisador semântico e tabela de símbolos — concluído
-- Checkpoint 5 — tratamento de erros e robustez — concluído nesta entrega
-- Checkpoint 6 — testes e documentação final
+- Checkpoint 5 — tratamento de erros e robustez — concluído
+- Checkpoint 6 — testes e documentação final — concluído nesta entrega
 - Checkpoint 7 — roteiro de estudo e defesa do código
 
 ## Uso de IA generativa

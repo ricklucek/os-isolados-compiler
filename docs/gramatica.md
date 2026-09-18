@@ -141,6 +141,7 @@ unario          = ( "+" | "-" | "NÃO" ), unario
 
 primario        = INTEGER_LITERAL
                 | REAL_LITERAL
+                | STRING_LITERAL
                 | "VER"
                 | "FAL"
                 | IDENTIFIER
@@ -174,3 +175,15 @@ A especificação fornecida não formaliza de maneira suficiente:
 - comandos de entrada e saída.
 
 Esses pontos continuam registrados como lacunas e não foram inventados silenciosamente neste checkpoint.
+
+
+## 11. Operações embutidas de entrada e saída
+
+A especificação exige um caso de entrada/saída nos testes, mas não define a sintaxe da Macaronica para essas operações. O grupo resolveu a lacuna usando a produção de chamada já existente:
+
+```ebnf
+entrada_saida   = "entrada", "(", lvalue, ")", ";"
+                | "saida", "(", expressao, ")", ";" ;
+```
+
+No lexer, `entrada` e `saida` continuam sendo `IDENTIFIER`. O parser as reconhece pela produção geral de `chamada`; a distinção e as restrições são aplicadas somente pelo analisador semântico.
