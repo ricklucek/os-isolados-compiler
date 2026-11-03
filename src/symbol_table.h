@@ -3,18 +3,7 @@
 
 #include <stddef.h>
 
-#include "token.h"
-
-typedef enum {
-    LANG_TYPE_ERROR = 0,
-    LANG_TYPE_BOOL,
-    LANG_TYPE_INTEIRA,
-    LANG_TYPE_FLUT,
-    LANG_TYPE_PALAVRA,
-    LANG_TYPE_DUPLOCARPADO,
-    LANG_TYPE_RECORD,
-    LANG_TYPE_VAZIO
-} LangType;
+#include "language_types.h"
 
 typedef enum {
     SYMBOL_VARIABLE = 0,
@@ -57,12 +46,7 @@ typedef enum {
     SYMBOL_DECLARE_MEMORY_ERROR
 } SymbolDeclareStatus;
 
-LangType lang_type_from_token(TokenType token_type);
-const char *lang_type_name(LangType type);
 const char *symbol_kind_name(SymbolKind kind);
-int lang_type_is_numeric(LangType type);
-int lang_type_can_assign(LangType target, LangType source);
-LangType lang_type_common_numeric(LangType left, LangType right);
 
 int symbol_table_init(SymbolTable *table);
 void symbol_table_free(SymbolTable *table);

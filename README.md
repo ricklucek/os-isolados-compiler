@@ -10,22 +10,23 @@ Front-end de compilador da linguagem **Macaronica**, desenvolvido para a discipl
 
 ## Objetivo
 
-Implementar em C as três etapas iniciais do front-end de um compilador:
+O projeto começou com o front-end completo da Macaronica em C:
 
 1. análise léxica;
 2. análise sintática;
 3. análise semântica.
 
-O projeto não gera código de máquina nem código intermediário executável. O resultado é a validação da entrada e a emissão de erros léxicos, sintáticos e semânticos.
+Na Parte 2, o mesmo compilador evolui para geração de LLVM IR, extensão vetorial via MLIR, otimização e execução em plataforma embarcada. O alvo físico planejado pelo grupo é o **Arduino Uno (ATmega328P/AVR)**.
 
 ## Estrutura
 
 ```text
-src/             código-fonte C
+src/             compilador C (front-end e, progressivamente, back-ends)
 tests/validos/   programas Macaronica válidos
 tests/invalidos/ programas Macaronica inválidos
 tests/robustez/  testes de falhas, recuperação e entradas adversas
-docs/            gramática, arquitetura e decisões de projeto
+tests/niveis/    programas de validação fornecidos na disciplina
+docs/            gramática, arquitetura e decisões de projeto/backend
 examples/        exemplos simples para execução manual
 ```
 
@@ -43,6 +44,12 @@ O projeto é compilado normalmente com:
 -std=c99 -Wall -Wextra -pedantic
 ```
 
+
+## Ferramentas da Parte 2
+
+A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. Os próximos checkpoints usarão `llvm-as`, `opt`, `lli`, `clang`, `mlir-opt` e `mlir-translate`. O Checkpoint 8 apenas prepara a representação interna; a integração dessas ferramentas ao ambiente Docker começa com o gerador LLVM.
+
+As decisões de geração, portabilidade e comportamento dependente do alvo ficam em `docs/decisoes_backend.md`.
 
 ## Ambiente Docker padronizado
 
@@ -259,7 +266,10 @@ Analisador semântico
       +-- retornos
       |
       v
-programa válido ou diagnósticos
+AST anotada com tipos
+      |
+      v
+(back-end LLVM no próximo checkpoint)
 ```
 
 Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a próxima etapa. Erros recuperáveis dentro da mesma fase são acumulados quando possível. Detalhes estão em `docs/robustez.md`.
@@ -273,7 +283,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 4 — analisador semântico e tabela de símbolos — concluído
 - Checkpoint 5 — tratamento de erros e robustez — concluído
 - Checkpoint 6 — testes e documentação final — concluído
-- Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído nesta entrega
+- Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído
+- Checkpoint 8 — AST anotada e contrato do back-end — concluído nesta entrega
+- Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — próximo
 
 
 ## Material de estudo e apresentação

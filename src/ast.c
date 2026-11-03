@@ -29,6 +29,7 @@ AstNode *ast_node_create(AstNodeKind kind, TokenType token_type,
 
     node->kind = kind;
     node->token_type = token_type;
+    node->inferred_type = LANG_TYPE_ERROR;
     node->line = line;
     node->column = column;
 
@@ -195,6 +196,9 @@ static void ast_print_node(const AstNode *node, FILE *stream,
         node->token_type != TOKEN_INVALID)
         fprintf(stream, " <%s>", token_type_name(node->token_type));
 
+    if (node->inferred_type != LANG_TYPE_ERROR)
+        fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
+
     fprintf(stream, " @%d:%d\n", node->line, node->column);
 
     snprintf(next_prefix, sizeof(next_prefix), "%s%s",
@@ -211,6 +215,8 @@ void ast_print(const AstNode *node, FILE *stream) {
     fprintf(stream, "%s", ast_node_kind_name(node->kind));
     if (node->lexeme != NULL && node->lexeme[0] != '\0')
         fprintf(stream, " [%s]", node->lexeme);
+    if (node->inferred_type != LANG_TYPE_ERROR)
+        fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
     fprintf(stream, " @%d:%d\n", node->line, node->column);
 
     for (i = 0U; i < node->child_count; ++i)

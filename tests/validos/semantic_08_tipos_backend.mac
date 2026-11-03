@@ -1,0 +1,18 @@
+inteira principal() @
+[
+    inteira i;
+    flut f;
+    duplocarpado d;
+    bool b;
+    palavra mensagem;
+
+    i receba 2;
+    f receba i + 2.5;
+    d receba 10.0;
+    d receba d + f;
+    b receba i < 10 E VER;
+    mensagem receba "ok";
+    saida(mensagem);
+
+    respost i;
+]

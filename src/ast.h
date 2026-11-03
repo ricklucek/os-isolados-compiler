@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include "language_types.h"
 #include "token.h"
 
 typedef enum {
@@ -38,6 +39,7 @@ typedef enum {
 typedef struct AstNode {
     AstNodeKind kind;
     TokenType token_type;
+    LangType inferred_type;
     char *lexeme;
     int line;
     int column;
