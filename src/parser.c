@@ -31,6 +31,8 @@ static AstNode *parse_block(Parser *parser);
 static AstNode *parse_expression(Parser *parser);
 static AstNode *parse_condition(Parser *parser);
 static AstNode *parse_assignment_core(Parser *parser);
+static AstNode *parse_unary(Parser *parser);
+static AstNode *parse_power(Parser *parser);
 
 static const Token *peek_token(const Parser *parser) {
     if (parser->tokens == NULL || parser->tokens->count == 0U) return NULL;
@@ -572,7 +574,7 @@ static AstNode *parse_primary(Parser *parser) {
     return NULL;
 }
 
-static AstNode *parse_unary(Parser *parser) {
+static AstNode *parse_unary_impl(Parser *parser) {
     const Token *op = match(parser, TOKEN_MINUS);
     if (op == NULL) op = match(parser, TOKEN_PLUS);
     if (op == NULL) op = match(parser, TOKEN_NAO);
@@ -583,7 +585,15 @@ static AstNode *parse_unary(Parser *parser) {
     return parse_primary(parser);
 }
 
-static AstNode *parse_power(Parser *parser) {
+static AstNode *parse_unary(Parser *parser) {
+    AstNode *result;
+    if (!parser_enter_recursion(parser, "operador unario")) return NULL;
+    result = parse_unary_impl(parser);
+    parser_leave_recursion(parser);
+    return result;
+}
+
+static AstNode *parse_power_impl(Parser *parser) {
     AstNode *left = parse_unary(parser);
     const Token *op;
     AstNode *right;
@@ -598,6 +608,14 @@ static AstNode *parse_power(Parser *parser) {
         return NULL;
     }
     return make_binary(parser, op, left, right);
+}
+
+static AstNode *parse_power(Parser *parser) {
+    AstNode *result;
+    if (!parser_enter_recursion(parser, "potencia")) return NULL;
+    result = parse_power_impl(parser);
+    parser_leave_recursion(parser);
+    return result;
 }
 
 static AstNode *parse_factor(Parser *parser) {
