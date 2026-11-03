@@ -171,3 +171,12 @@ Assim, a fronteira arquitetural é:
 ```text
 AST estrutural -> semântico -> AST anotada -> codegen
 ```
+
+
+## Estado do Checkpoint 9
+
+A primeira geração LLVM está ativa para o subconjunto escalar: `principal` inteira sem parâmetros, globais/locais escalares primitivos, atribuições a identificador, retornos, literais, promoções, aritmética básica, comparações, XOR, operadores unários e E/S básica via runtime POSIX.
+
+Ainda são erros controlados de codegen: condicionais/laços, funções de usuário, vetores, registros, `^`, `raiz()` e curto-circuito de `E`/`OU`. Esses casos não geram IR parcial utilizável: a CLI remove o arquivo de saída quando o lowering falha.
+
+A convenção inicial de `saida(expressao)` é imprimir o valor seguido de quebra de linha. `bool` é impresso como `VER`/`FAL`; `flut` e `duplocarpado` usam seis casas decimais no runtime POSIX. Essa formatação poderá ser revisada desde que permaneça documentada e coberta por saídas esperadas.

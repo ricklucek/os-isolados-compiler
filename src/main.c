@@ -8,6 +8,7 @@
  */
 
 #include "ast.h"
+#include "codegen_llvm.h"
 #include "errors.h"
 #include "lexer.h"
 #include "parser.h"
@@ -16,7 +17,7 @@
 
 static void print_usage(FILE *stream, const char *program) {
     fprintf(stream,
-            "Uso: %s <arquivo.mac> [--tokens] [--ast] [--lexer-only] [--parser-only]\n",
+            "Uso: %s <arquivo.mcn> [--tokens] [--ast] [--lexer-only] [--parser-only] [-o saida.ll]\n",
             program);
 }
 
@@ -27,6 +28,7 @@ static void print_help(const char *program) {
     printf("  --ast          exibe a AST produzida pelo parser\n");
     printf("  --lexer-only   executa somente a analise lexica\n");
     printf("  --parser-only  executa lexer + parser, sem analise semantica\n");
+    printf("  -o <arquivo>   gera LLVM IR textual apos validar o programa\n");
     printf("  -h, --help     exibe esta ajuda\n");
     printf("\nCodigos de saida:\n");
     printf("  0 sucesso\n");
@@ -37,10 +39,13 @@ static void print_help(const char *program) {
     printf("  5 falha interna no parser\n");
     printf("  6 erro semantico\n");
     printf("  7 falha interna no analisador semantico\n");
+    printf("  8 construcao valida ainda nao suportada pelo codegen LLVM\n");
+    printf("  9 falha interna/de escrita no codegen LLVM\n");
 }
 
 int main(int argc, char *argv[]) {
     const char *source_path;
+    const char *output_path = NULL;
     int print_tokens = 0;
     int print_ast = 0;
     int lexer_only = 0;
@@ -49,6 +54,7 @@ int main(int argc, char *argv[]) {
     LexerStatus lexer_status;
     ParserResult parser_result;
     SemanticResult semantic_result;
+    CodegenLlvmResult codegen_result;
     AstNode *ast = NULL;
     size_t invalid_count;
     int i;
@@ -59,7 +65,7 @@ int main(int argc, char *argv[]) {
         return COMPILER_EXIT_OK;
     }
 
-    if (argc < 2 || argc > 5 || argv[1][0] == '\0') {
+    if (argc < 2 || argv[1][0] == '\0') {
         print_usage(stderr, argv[0]);
         return COMPILER_EXIT_USAGE;
     }
@@ -74,7 +80,13 @@ int main(int argc, char *argv[]) {
             lexer_only = 1;
         else if (strcmp(argv[i], "--parser-only") == 0)
             parser_only = 1;
-        else {
+        else if (strcmp(argv[i], "-o") == 0) {
+            if (output_path != NULL || i + 1 >= argc || argv[i + 1][0] == '\0') {
+                fprintf(stderr, "Erro: -o exige exatamente um caminho de saida.\n");
+                return COMPILER_EXIT_USAGE;
+            }
+            output_path = argv[++i];
+        } else {
             fprintf(stderr, "Erro: opcao desconhecida '%s'.\n", argv[i]);
             print_usage(stderr, argv[0]);
             return COMPILER_EXIT_USAGE;
@@ -84,6 +96,18 @@ int main(int argc, char *argv[]) {
     if ((lexer_only && print_ast) || (lexer_only && parser_only)) {
         fprintf(stderr,
                 "Erro: --lexer-only nao pode ser combinado com --ast ou --parser-only.\n");
+        return COMPILER_EXIT_USAGE;
+    }
+
+    if (output_path != NULL && (lexer_only || parser_only)) {
+        fprintf(stderr,
+                "Erro: -o exige o pipeline completo ate a analise semantica.\n");
+        return COMPILER_EXIT_USAGE;
+    }
+
+    if (output_path != NULL && strcmp(output_path, source_path) == 0) {
+        fprintf(stderr,
+                "Erro: arquivo de saida nao pode sobrescrever o fonte.\n");
         return COMPILER_EXIT_USAGE;
     }
 
@@ -167,6 +191,41 @@ int main(int argc, char *argv[]) {
     if (print_ast) {
         printf("AST anotada:\n");
         ast_print(ast, stdout);
+    }
+
+    if (output_path != NULL) {
+        FILE *llvm_output = fopen(output_path, "wb");
+        int close_failed;
+
+        if (llvm_output == NULL) {
+            fprintf(stderr,
+                    "Erro: nao foi possivel abrir '%s' para escrita.\n",
+                    output_path);
+            ast_free(ast);
+            token_list_free(&tokens);
+            return COMPILER_EXIT_CODEGEN_INTERNAL;
+        }
+
+        codegen_result =
+            codegen_llvm_generate(ast, llvm_output, stderr);
+        close_failed = fclose(llvm_output) != 0;
+
+        if (codegen_result.status != CODEGEN_LLVM_OK || close_failed) {
+            (void)remove(output_path);
+            if (close_failed)
+                fprintf(stderr,
+                        "Erro: falha ao finalizar o arquivo LLVM '%s'.\n",
+                        output_path);
+
+            ast_free(ast);
+            token_list_free(&tokens);
+            return codegen_result.status == CODEGEN_LLVM_MEMORY_ERROR ||
+                           close_failed
+                       ? COMPILER_EXIT_CODEGEN_INTERNAL
+                       : COMPILER_EXIT_CODEGEN_ERROR;
+        }
+
+        printf("Geracao LLVM: OK (%s).\n", output_path);
     }
 
     ast_free(ast);
