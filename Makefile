@@ -48,12 +48,8 @@ emit-llvm: $(TARGET)
 
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
-	@./$(TARGET) "$(FILE)" -o .llvm-run.ll >/dev/null
-	@$(LLVM_AS) .llvm-run.ll -o /dev/null
-	@$(LLVM_OPT) -passes=verify .llvm-run.ll -disable-output
-	@$(CLANG_LLVM) -std=c99 -Wall -Wextra -pedantic .llvm-run.ll runtime/zl_runtime_posix.c -Iruntime -o .llvm-run
-	@status=0; ./.llvm-run || status=$?; echo "codigo de saida: $status"
-	@rm -f .llvm-run.ll .llvm-run
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
+		sh scripts/run_llvm.sh "$(FILE)" ./$(TARGET)
 
 package:
 	@rm -f macaronica-entrega.zip
@@ -137,32 +133,8 @@ test-backend-prep: $(TARGET)
 
 test-llvm: $(TARGET)
 	@echo "== Geracao e validacao LLVM IR =="
-	@rm -f .llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-invalid.ll
-	@./$(TARGET) tests/execucao/01_retorno_basico.mcn -o .llvm-test.ll >/dev/null
-	@! grep -Eq '^target[[:space:]]+triple' .llvm-test.ll
-	@! grep -Eq '^target[[:space:]]+datalayout' .llvm-test.ll
-	@grep -q 'define i32 @zl_principal() nounwind' .llvm-test.ll
-	@$(LLVM_AS) .llvm-test.ll -o .llvm-test.bc
-	@$(LLVM_OPT) -passes=verify .llvm-test.ll -disable-output
-	@status=0; $(LLVM_LLI) --entry-function=zl_principal .llvm-test.ll >/dev/null || status=$?; \
-		test "$status" -eq 42
-	@$(CLANG_LLVM) -std=c99 -Wall -Wextra -pedantic .llvm-test.ll runtime/zl_runtime_posix.c -Iruntime -o .llvm-test-prog
-	@status=0; ./.llvm-test-prog >/dev/null || status=$?; test "$status" -eq 42
-	@./$(TARGET) tests/execucao/02_variaveis_expressoes.mcn -o .llvm-test.ll >/dev/null
-	@$(LLVM_AS) .llvm-test.ll -o /dev/null
-	@status=0; $(LLVM_LLI) --entry-function=zl_principal .llvm-test.ll >/dev/null || status=$?; \
-		test "$status" -eq 42
-	@./$(TARGET) tests/execucao/03_saida_tipos.mcn -o .llvm-test.ll >/dev/null
-	@$(LLVM_OPT) -passes=verify .llvm-test.ll -disable-output
-	@$(CLANG_LLVM) -std=c99 -Wall -Wextra -pedantic .llvm-test.ll runtime/zl_runtime_posix.c -Iruntime -o .llvm-test-prog
-	@./.llvm-test-prog > .llvm-test.out
-	@cmp -s .llvm-test.out tests/execucao/03_saida_tipos.esperado
-	@if ./$(TARGET) tests/invalidos/semantic_01_nao_declarada.mac -o .llvm-invalid.ll >/dev/null 2>&1; then \
-		echo "FALHA: fonte invalido foi aceito com -o."; exit 1; \
-	fi
-	@test ! -e .llvm-invalid.ll
-	@rm -f .llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out
-	@echo "LLVM IR valida, executavel e portavel nos casos do checkpoint."
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LLI="$(LLVM_LLI)" \
+		CLANG_LLVM="$(CLANG_LLVM)" sh tests/execucao/run.sh ./$(TARGET)
 
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
