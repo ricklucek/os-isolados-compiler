@@ -1,5 +1,10 @@
 #include "errors.h"
 
+/*
+ * Contrato compartilhado de fases e codigos de saida. Os detalhes de cada
+ * diagnostico permanecem nos modulos que possuem contexto para explica-lo.
+ */
+
 const char *compiler_phase_name(CompilerPhase phase) {
     switch (phase) {
         case COMPILER_PHASE_LEXICAL: return "lexica";
