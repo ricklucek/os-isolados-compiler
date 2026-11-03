@@ -11,11 +11,12 @@ IR=.llvm-test.ll
 BC=.llvm-test.bc
 PROG=.llvm-test-prog
 OUT=.llvm-test.out
+EXPECTED=.llvm-test.expected
 INVALID=.llvm-invalid.ll
 UNSUPPORTED=.llvm-unsupported.ll
 
 cleanup() {
-    rm -f "$IR" "$BC" "$PROG" "$OUT" "$INVALID" "$UNSUPPORTED"
+    rm -f "$IR" "$BC" "$PROG" "$OUT" "$EXPECTED" "$INVALID" "$UNSUPPORTED"
 }
 trap cleanup EXIT INT TERM
 cleanup
@@ -71,7 +72,8 @@ status=0
 "$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
     fail "clang nao ligou programa de saida"
 "./$PROG" > "$OUT" || fail "programa de saida retornou erro"
-cmp -s "$OUT" tests/execucao/03_saida_tipos.esperado ||
+tr -d '\r' < tests/execucao/03_saida_tipos.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" ||
     fail "saida do runtime POSIX divergiu do esperado"
 
 if "$BIN" tests/invalidos/semantic_01_nao_declarada.mac     -o "$INVALID" >/dev/null 2>&1; then

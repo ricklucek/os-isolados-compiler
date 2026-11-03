@@ -8,3 +8,7 @@
 *.yaml text eol=lf
 Makefile text eol=lf
 Dockerfile text eol=lf
+
+*.mcn text eol=lf
+*.esperado text eol=lf
+*.yml text eol=lf
