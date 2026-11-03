@@ -1,0 +1,18 @@
+inteira principal() @
+[
+    inteira i;
+    flut f;
+    bool ok;
+    palavra mensagem;
+
+    i receba 2;
+    f receba i + 0.5;
+    ok receba i < 10;
+    mensagem receba "checkpoint 9";
+
+    saida(mensagem);
+    saida(f);
+    saida(ok);
+
+    respost 0;
+]
