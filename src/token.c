@@ -1,5 +1,10 @@
 #include "token.h"
 
+/*
+ * Infraestrutura da lista dinamica de tokens. Cada lexema e copiado para que
+ * a TokenList tenha ciclo de vida independente do buffer original do lexer.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
