@@ -1,13 +1,27 @@
 #include "parser.h"
 
+/*
+ * Parser por descida recursiva.
+ * Alem de validar a gramatica, constroi a AST e tenta sincronizar apos erros
+ * para produzir mais de um diagnostico sem perder o limite do bloco atual.
+ */
+
 #include <stdarg.h>
 #include <stdio.h>
+
+#define PARSER_MAX_RECURSION_DEPTH 512U
+#define PARSER_MAX_EXPRESSION_NODES 1024U
 
 typedef struct {
     const TokenList *tokens;
     size_t current;
     size_t error_count;
     int memory_error;
+    int depth_error;
+    int complexity_error;
+    size_t recursion_depth;
+    size_t expression_depth;
+    size_t expression_nodes;
     FILE *error_stream;
 } Parser;
 
@@ -84,6 +98,31 @@ static void parser_memory_error(Parser *parser) {
     parser->memory_error = 1;
 }
 
+/*
+ * Limita recursao sintatica deliberadamente. Entradas artificiais com dezenas
+ * de milhares de parenteses/blocos devem gerar erro controlado, nao stack
+ * overflow do processo do compilador.
+ */
+static int parser_enter_recursion(Parser *parser, const char *context) {
+    if (parser->recursion_depth >= PARSER_MAX_RECURSION_DEPTH) {
+        if (!parser->depth_error) {
+            parser_error_at(
+                parser, peek_token(parser),
+                "limite de aninhamento sintatico excedido (%u) durante %s",
+                (unsigned int)PARSER_MAX_RECURSION_DEPTH,
+                context != NULL ? context : "analise");
+            parser->depth_error = 1;
+        }
+        return 0;
+    }
+    ++parser->recursion_depth;
+    return 1;
+}
+
+static void parser_leave_recursion(Parser *parser) {
+    if (parser->recursion_depth > 0U) --parser->recursion_depth;
+}
+
 static const Token *consume(Parser *parser, TokenType type,
                             const char *message) {
     const Token *token;
@@ -114,7 +153,7 @@ static int starts_statement(TokenType type) {
 
 static int starts_top_level(TokenType type) {
     return type == TOKEN_REGISTRO || type == TOKEN_OUTRAFUNCAO ||
-           is_return_type(type);
+           type == TOKEN_IDENTIFIER || is_return_type(type);
 }
 
 static void synchronize_statement(Parser *parser) {
@@ -173,6 +212,22 @@ static AstNode *make_binary(Parser *parser, const Token *op,
         ast_free(left);
         ast_free(right);
         return NULL;
+    }
+
+    if (parser->expression_depth > 0U) {
+        ++parser->expression_nodes;
+        if (parser->expression_nodes > PARSER_MAX_EXPRESSION_NODES) {
+            if (!parser->complexity_error) {
+                parser_error_at(
+                    parser, op,
+                    "expressao excede o limite de %u operadores compostos",
+                    (unsigned int)PARSER_MAX_EXPRESSION_NODES);
+                parser->complexity_error = 1;
+            }
+            ast_free(left);
+            ast_free(right);
+            return NULL;
+        }
     }
 
     node = node_from_token(parser, AST_BINARY_EXPR, op);
@@ -310,6 +365,44 @@ static AstNode *parse_variable_declaration(Parser *parser) {
     return node;
 }
 
+static AstNode *parse_record_variable_declaration(Parser *parser) {
+    const Token *type_name =
+        consume(parser, TOKEN_IDENTIFIER, "declaracao de registro exige tipo");
+    AstNode *node;
+
+    if (type_name == NULL) return NULL;
+    node = new_node(parser, AST_VAR_DECL, TOKEN_IDENTIFIER, type_name->lexeme,
+                    type_name->line, type_name->column);
+    if (node == NULL) return NULL;
+
+    for (;;) {
+        const Token *name =
+            consume(parser, TOKEN_IDENTIFIER,
+                    "declaracao de registro exige nome da variavel");
+        AstNode *identifier;
+        if (name == NULL) {
+            ast_free(node);
+            return NULL;
+        }
+
+        identifier = node_from_token(parser, AST_IDENTIFIER, name);
+        if (identifier == NULL || !add_child(parser, node, identifier)) {
+            if (identifier != NULL) ast_free(identifier);
+            ast_free(node);
+            return NULL;
+        }
+
+        if (match(parser, TOKEN_COMMA) == NULL) break;
+    }
+
+    if (consume(parser, TOKEN_SEMICOLON,
+                "declaracao de registro deve terminar com ';'") == NULL) {
+        ast_free(node);
+        return NULL;
+    }
+    return node;
+}
+
 static AstNode *parse_parameter(Parser *parser) {
     const Token *type_token = parse_value_type(parser, "parametro");
     const Token *name;
@@ -435,6 +528,26 @@ static AstNode *parse_primary(Parser *parser) {
             }
             if (!add_child(parser, access, index)) {
                 ast_free(index);
+                ast_free(access);
+                return NULL;
+            }
+            return access;
+        }
+
+        if (match(parser, TOKEN_DOT) != NULL) {
+            const Token *field =
+                consume(parser, TOKEN_IDENTIFIER,
+                        "acesso a campo exige identificador depois de '.'");
+            AstNode *access;
+            AstNode *field_node;
+            if (field == NULL) return NULL;
+
+            access = new_node(parser, AST_FIELD_ACCESS, TOKEN_IDENTIFIER,
+                              token->lexeme, token->line, token->column);
+            if (access == NULL) return NULL;
+            field_node = node_from_token(parser, AST_IDENTIFIER, field);
+            if (field_node == NULL || !add_child(parser, access, field_node)) {
+                if (field_node != NULL) ast_free(field_node);
                 ast_free(access);
                 return NULL;
             }
@@ -618,7 +731,7 @@ static AstNode *parse_logical_xor(Parser *parser) {
     return left;
 }
 
-static AstNode *parse_expression(Parser *parser) {
+static AstNode *parse_expression_impl(Parser *parser) {
     AstNode *left = parse_logical_xor(parser);
     if (left == NULL) return NULL;
 
@@ -637,77 +750,29 @@ static AstNode *parse_expression(Parser *parser) {
     return left;
 }
 
-static AstNode *parse_condition_operand(Parser *parser) {
-    const Token *token;
+static AstNode *parse_expression(Parser *parser) {
+    AstNode *result;
+    const int outermost = parser->expression_depth == 0U;
 
-    token = match(parser, TOKEN_INTEGER_LITERAL);
-    if (token != NULL)
-        return node_from_token(parser, AST_INTEGER_LITERAL, token);
-
-    token = match(parser, TOKEN_REAL_LITERAL);
-    if (token != NULL)
-        return node_from_token(parser, AST_REAL_LITERAL, token);
-
-    token = match(parser, TOKEN_IDENTIFIER);
-    if (token != NULL) {
-        if (match(parser, TOKEN_LEFT_BRACE) != NULL) {
-            AstNode *access = new_node(
-                parser, AST_VECTOR_ACCESS, TOKEN_IDENTIFIER,
-                token->lexeme, token->line, token->column);
-            AstNode *index;
-            if (access == NULL) return NULL;
-            index = parse_expression(parser);
-            if (index == NULL) {
-                ast_free(access);
-                return NULL;
-            }
-            if (consume(parser, TOKEN_RIGHT_BRACE,
-                        "acesso a vetor na condicao exige '}'") == NULL) {
-                ast_free(index);
-                ast_free(access);
-                return NULL;
-            }
-            if (!add_child(parser, access, index)) {
-                ast_free(index);
-                ast_free(access);
-                return NULL;
-            }
-            return access;
-        }
-        return node_from_token(parser, AST_IDENTIFIER, token);
+    if (!parser_enter_recursion(parser, "expressao")) return NULL;
+    if (outermost) {
+        parser->expression_nodes = 0U;
+        parser->complexity_error = 0;
     }
 
-    parser_error_at(
-        parser, peek_token(parser),
-        "condicao exige VAR ou NUM como operando, conforme a especificacao");
-    return NULL;
+    ++parser->expression_depth;
+    result = parse_expression_impl(parser);
+    --parser->expression_depth;
+    parser_leave_recursion(parser);
+    return result;
 }
 
 static AstNode *parse_condition(Parser *parser) {
-    AstNode *left = parse_condition_operand(parser);
-    const Token *op;
-    AstNode *right;
-
-    if (left == NULL) return NULL;
-
-    op = match(parser, TOKEN_LESS);
-    if (op == NULL) op = match(parser, TOKEN_GREATER);
-    if (op == NULL) op = match(parser, TOKEN_EQUAL_EQUAL);
-    if (op == NULL) op = match(parser, TOKEN_BANG);
-
-    if (op == NULL) {
-        parser_error_at(parser, peek_token(parser),
-                        "condicao exige comparador '<', '>', '==' ou '!'");
-        ast_free(left);
-        return NULL;
-    }
-
-    right = parse_condition_operand(parser);
-    if (right == NULL) {
-        ast_free(left);
-        return NULL;
-    }
-    return make_binary(parser, op, left, right);
+    /*
+     * Depois do feedback da avaliacao, condicoes usam a mesma gramatica de
+     * expressoes. A fase semantica continua exigindo resultado bool.
+     */
+    return parse_expression(parser);
 }
 
 static AstNode *parse_lvalue(Parser *parser) {
@@ -735,6 +800,26 @@ static AstNode *parse_lvalue(Parser *parser) {
         }
         if (!add_child(parser, access, index)) {
             ast_free(index);
+            ast_free(access);
+            return NULL;
+        }
+        return access;
+    }
+
+    if (match(parser, TOKEN_DOT) != NULL) {
+        const Token *field =
+            consume(parser, TOKEN_IDENTIFIER,
+                    "acesso a campo exige identificador depois de '.'");
+        AstNode *access;
+        AstNode *field_node;
+        if (field == NULL) return NULL;
+
+        access = new_node(parser, AST_FIELD_ACCESS, TOKEN_IDENTIFIER,
+                          name->lexeme, name->line, name->column);
+        if (access == NULL) return NULL;
+        field_node = node_from_token(parser, AST_IDENTIFIER, field);
+        if (field_node == NULL || !add_child(parser, access, field_node)) {
+            if (field_node != NULL) ast_free(field_node);
             ast_free(access);
             return NULL;
         }
@@ -788,6 +873,11 @@ static AstNode *parse_assignment_core(Parser *parser) {
 
 static AstNode *parse_identifier_statement(Parser *parser) {
     if (!check(parser, TOKEN_IDENTIFIER)) return NULL;
+
+    if (parser->current + 1U < parser->tokens->count &&
+        parser->tokens->items[parser->current + 1U].type ==
+            TOKEN_IDENTIFIER)
+        return parse_record_variable_declaration(parser);
 
     if (parser->current + 1U < parser->tokens->count &&
         parser->tokens->items[parser->current + 1U].type ==
@@ -1183,7 +1273,7 @@ static AstNode *parse_statement(Parser *parser) {
     return NULL;
 }
 
-static AstNode *parse_block(Parser *parser) {
+static AstNode *parse_block_impl(Parser *parser) {
     const Token *left =
         consume(parser, TOKEN_LEFT_BRACKET, "bloco exige '['");
     AstNode *block;
@@ -1217,6 +1307,14 @@ static AstNode *parse_block(Parser *parser) {
         return NULL;
     }
     return block;
+}
+
+static AstNode *parse_block(Parser *parser) {
+    AstNode *result;
+    if (!parser_enter_recursion(parser, "bloco")) return NULL;
+    result = parse_block_impl(parser);
+    parser_leave_recursion(parser);
+    return result;
 }
 
 static AstNode *parse_record(Parser *parser) {
@@ -1375,6 +1473,11 @@ static AstNode *parse_top_level(Parser *parser) {
     if (token->type == TOKEN_OUTRAFUNCAO)
         return parse_function(parser);
 
+    if (token->type == TOKEN_IDENTIFIER &&
+        parser->current + 1U < parser->tokens->count &&
+        parser->tokens->items[parser->current + 1U].type == TOKEN_IDENTIFIER)
+        return parse_record_variable_declaration(parser);
+
     if (is_return_type(token->type)) {
         if (parser->current + 1U < parser->tokens->count &&
             parser->tokens->items[parser->current + 1U].type ==
@@ -1415,6 +1518,11 @@ ParserResult parser_parse_ast(const TokenList *tokens, AstNode **out_ast,
     parser.current = 0U;
     parser.error_count = 0U;
     parser.memory_error = 0;
+    parser.depth_error = 0;
+    parser.complexity_error = 0;
+    parser.recursion_depth = 0U;
+    parser.expression_depth = 0U;
+    parser.expression_nodes = 0U;
     parser.error_stream = error_stream != NULL ? error_stream : stderr;
 
     if (tokens == NULL || tokens->count == 0U) {
