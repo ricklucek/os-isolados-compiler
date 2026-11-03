@@ -158,7 +158,9 @@ A primeira geração usará a forma “em memória”:
 - leitura -> `load`;
 - atribuição -> `store`.
 
-Não construiremos `phi` manualmente. A SSA promovida será obtida com `opt -passes=mem2reg`, e ao menos um caso com laço/condicional será documentado antes/depois.
+Para **variáveis mutáveis**, não construiremos `phi` manualmente. A SSA promovida será obtida com `opt -passes=mem2reg`.
+
+Há uma exceção deliberada: `E` e `OU` com curto-circuito são expressões de valor. O Checkpoint 10 gera um `phi i1` no bloco de merge para combinar a constante do caminho curto com o valor calculado no operando direito. Esse `phi` não substitui o papel do `mem2reg` sobre variáveis; ele representa diretamente a semântica da expressão.
 
 ## B16 — AST anotada como contrato do backend
 
@@ -180,3 +182,12 @@ A primeira geração LLVM está ativa para o subconjunto escalar: `principal` in
 Ainda são erros controlados de codegen: condicionais/laços, funções de usuário, vetores, registros, `^`, `raiz()` e curto-circuito de `E`/`OU`. Esses casos não geram IR parcial utilizável: a CLI remove o arquivo de saída quando o lowering falha.
 
 A convenção inicial de `saida(expressao)` é imprimir o valor seguido de quebra de linha. `bool` é impresso como `VER`/`FAL`; `flut` e `duplocarpado` usam seis casas decimais no runtime POSIX. Essa formatação poderá ser revisada desde que permaneça documentada e coberta por saídas esperadas.
+
+
+## Estado do Checkpoint 10
+
+O lowering LLVM agora cobre `cond/casocontrario`, `durante` e `repete`, com blocos básicos e terminadores válidos. `E` e `OU` implementam a decisão B05 com curto-circuito real e `phi i1`.
+
+Variáveis escalares declaradas em blocos internos são pré-alocadas no `entry`, mas só ficam visíveis quando sua declaração é alcançada. O gerador mantém profundidade de escopo e nomes LLVM únicos para sombreamento, permitindo, por exemplo, `%x.addr` e `%x.1.addr`.
+
+O teste de laços também executa `opt -passes=mem2reg` e exige a presença de `phi i32`, servindo como evidência automatizada da transformação para SSA.

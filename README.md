@@ -165,7 +165,7 @@ Depois de o programa passar por lexer, parser e semântico, a opção `-o` gera 
 ./macaronica programa.mcn -o programa.ll
 ```
 
-Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. No Checkpoint 9, o gerador cobre `principal` inteira sem parâmetros, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, XOR, unários e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Construções ainda não rebaixadas geram diagnóstico de codegen em vez de IR inválida.
+Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. Até o Checkpoint 10, o gerador cobre `principal` inteira sem parâmetros, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, operadores lógicos, `cond/casocontrario`, `durante`, `repete` e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Construções ainda não rebaixadas geram diagnóstico de codegen em vez de IR inválida.
 
 Validar um arquivo e a IR com LLVM:
 
@@ -176,7 +176,13 @@ make emit-llvm FILE=tests/execucao/02_variaveis_expressoes.mcn OUT=programa.ll
 Gerar, ligar com `runtime/zl_runtime_posix.c` e executar:
 
 ```bash
-make run-llvm FILE=tests/execucao/03_saida_tipos.mcn
+make run-llvm FILE=tests/execucao/05_lacos.mcn
+```
+
+Para observar a promoção automática para SSA e os `phi` inseridos pelo LLVM:
+
+```bash
+make show-mem2reg FILE=tests/execucao/05_lacos.mcn
 ```
 
 O código gerado define `@zl_principal`; o `main` real fica no runtime da plataforma.
@@ -313,8 +319,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 6 — testes e documentação final — concluído
 - Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído
 - Checkpoint 8 — AST anotada e contrato do back-end — concluído
-- Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído nesta entrega
-- Checkpoint 10 — LLVM: condicionais e laços — próximo
+- Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído
+- Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído nesta entrega
+- Checkpoint 11 — LLVM: funções, chamadas, recursão e intrínsecos — próximo
 
 
 ## Material de estudo e apresentação

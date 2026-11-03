@@ -10,7 +10,7 @@ CLANG_LLVM ?= clang-18
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -50,6 +50,15 @@ run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
 		sh scripts/run_llvm.sh "$(FILE)" ./$(TARGET)
+
+show-mem2reg: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make show-mem2reg FILE=programa.mcn"; exit 1; }
+	@./$(TARGET) "$(FILE)" -o .llvm-before.ll >/dev/null
+	@$(LLVM_OPT) -S -passes=mem2reg .llvm-before.ll -o .llvm-after.ll
+	@echo "Antes:  .llvm-before.ll"
+	@echo "Depois: .llvm-after.ll"
+	@echo "PHI encontrados:"
+	@grep -n ' phi ' .llvm-after.ll || true
 
 package:
 	@rm -f macaronica-entrega.zip
@@ -178,4 +187,4 @@ docker-sanitize:
 clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
 		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-invalid.ll \
-		.llvm-run.ll .llvm-run macaronica-entrega.zip
+		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll macaronica-entrega.zip
