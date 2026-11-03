@@ -48,7 +48,7 @@ status=0
 [ "$status" -eq 42 ] ||
     fail "lli esperava codigo 42 e recebeu $status"
 
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
     fail "clang nao ligou IR + runtime POSIX"
 
 status=0
@@ -70,7 +70,7 @@ status=0
     fail "nao gerou programa de saida"
 "$LLVM_OPT" -passes=verify "$IR" -disable-output ||
     fail "verify rejeitou programa de saida"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
     fail "clang nao ligou programa de saida"
 "./$PROG" > "$OUT" || fail "programa de saida retornou erro"
 tr -d '\r' < tests/execucao/03_saida_tipos.esperado > "$EXPECTED"

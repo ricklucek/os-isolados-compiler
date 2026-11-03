@@ -200,8 +200,13 @@ static const Storage *lookup_storage(const CodegenContext *context,
 
 static void storage_pointer(const Storage *storage,
                             char buffer[LLVM_OPERAND_CAPACITY]) {
-    snprintf(buffer, LLVM_OPERAND_CAPACITY, "%c%s",
-             storage->global ? '@' : '%', storage->llvm_name);
+    size_t length = strlen(storage->llvm_name);
+    if (length > LLVM_OPERAND_CAPACITY - 2U)
+        length = LLVM_OPERAND_CAPACITY - 2U;
+
+    buffer[0] = storage->global ? '@' : '%';
+    memcpy(buffer + 1U, storage->llvm_name, length);
+    buffer[length + 1U] = '\0';
 }
 
 static int grow_strings(CodegenContext *context) {

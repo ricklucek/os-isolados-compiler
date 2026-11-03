@@ -22,6 +22,7 @@ jobs:
           make check FILE=tests/niveis/nivel1_soma.mcn
           make inspect FILE=tests/niveis/nivel1_soma.mcn >/dev/null
           make check-dir DIR=tests/niveis
+          make show-mem2reg FILE=tests/execucao/05_lacos.mcn >/dev/null
       - name: Sanitizers
         run: make test-sanitize
       - name: Delivery package
