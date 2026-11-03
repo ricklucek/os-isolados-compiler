@@ -139,8 +139,8 @@ test-llvm: $(TARGET)
 	@echo "== Geracao e validacao LLVM IR =="
 	@rm -f .llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-invalid.ll
 	@./$(TARGET) tests/execucao/01_retorno_basico.mcn -o .llvm-test.ll >/dev/null
-	@! grep -q 'target triple' .llvm-test.ll
-	@! grep -q 'target datalayout' .llvm-test.ll
+	@! grep -Eq '^target[[:space:]]+triple' .llvm-test.ll
+	@! grep -Eq '^target[[:space:]]+datalayout' .llvm-test.ll
 	@grep -q 'define i32 @zl_principal() nounwind' .llvm-test.ll
 	@$(LLVM_AS) .llvm-test.ll -o .llvm-test.bc
 	@$(LLVM_OPT) -passes=verify .llvm-test.ll -disable-output
