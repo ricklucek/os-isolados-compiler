@@ -164,3 +164,12 @@ Regras:
 - os nomes `entrada` e `saida` são reservados semanticamente e não podem ser declarados pelo programa.
 
 Essas operações são apenas validadas. O compilador não executa o programa de entrada, portanto nenhuma leitura ou escrita real é realizada.
+
+
+## 12. Revisões após avaliação
+
+- Um programa completo deve possuir exatamente uma `principal`; ausência é erro semântico.
+- Condições de `cond`, `durante` e `repete` aceitam expressões gerais, mas precisam resultar em `bool`.
+- Funções não-`vazio` precisam garantir `respost` em todos os caminhos reconhecidos pela análise conservadora.
+- Índices constantes de vetor são comparados ao tamanho declarado.
+- Instâncias simples de registro usam `Tipo variavel;` e acesso escalar `variavel.campo`; tipo e campo precisam existir.

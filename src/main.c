@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * Ponto de entrada do front-end. Este arquivo apenas orquestra as fases:
+ * fonte -> lexer -> TokenList -> parser/AST -> analise semantica.
+ * Uma fase posterior so executa quando a anterior termina com representacao valida.
+ */
+
 #include "ast.h"
 #include "errors.h"
 #include "lexer.h"

@@ -1,0 +1,927 @@
+registro Cuidador @
+[
+palavra nome;
+inteira documento;
+inteira idade;
+]
+
+registro Recinto @
+[
+palavra nome;
+inteira capacidade;
+inteira ocupacaoAtual;
+]
+
+outrafuncao inteira resto(inteira a, inteira b) @
+[
+inteira quociente;
+inteira r;
+quociente receba a // b;
+r receba quociente * b;
+r receba a - r;
+respost r;
+]
+
+outrafuncao bool validarCpf(inteira doc) @
+[
+inteira restoOnze;
+bool valido;
+restoOnze receba resto(doc, 11);
+valido receba restoOnze ! 0;
+respost valido;
+]
+
+outrafuncao bool ehPrimo(inteira n) @
+[
+bool primo;
+inteira divisor;
+inteira quociente;
+inteira restoDivisao;
+primo receba VER;
+cond ( n < 2 ) edai
+[
+primo receba FAL;
+]
+divisor receba 2;
+durante ( divisor < n ) edai
+[
+quociente receba n // divisor;
+restoDivisao receba quociente * divisor;
+restoDivisao receba n - restoDivisao;
+cond ( restoDivisao == 0 ) edai
+[
+primo receba FAL;
+]
+divisor receba divisor + 1;
+]
+respost primo;
+]
+
+outrafuncao inteira fibonacci(inteira n) @
+[
+inteira resultado;
+inteira parteUm;
+inteira parteDois;
+cond ( n < 2 ) edai
+[
+resultado receba n;
+]
+casocontrario edai
+[
+parteUm receba fibonacci(n - 1);
+parteDois receba fibonacci(n - 2);
+resultado receba parteUm + parteDois;
+]
+respost resultado;
+]
+
+outrafuncao bool verificarFaixaEtaria(inteira idade, inteira minimo, inteira maximo) @
+[
+bool acimaDoMinimo;
+bool abaixoDoMaximo;
+bool dentroDaFaixa;
+bool foraDaFaixa;
+acimaDoMinimo receba idade > minimo;
+abaixoDoMaximo receba idade < maximo;
+dentroDaFaixa receba acimaDoMinimo E abaixoDoMaximo;
+foraDaFaixa receba NÃO dentroDaFaixa;
+respost foraDaFaixa;
+]
+
+outrafuncao inteira maximoDoisInteiros(inteira a, inteira b) @
+[
+inteira maior;
+cond ( a > b ) edai
+[
+maior receba a;
+]
+casocontrario edai
+[
+maior receba b;
+]
+respost maior;
+]
+
+inteira principal() @
+[
+inteira i;
+inteira j;
+inteira k;
+inteira tamanho;
+inteira limiteSort;
+inteira qtdCuidadores;
+inteira tempPeso;
+palavra tempNome;
+inteira tempIdade;
+palavra tempEspecie;
+inteira pesoAtual;
+inteira pesoProximo;
+palavra nomeAtual;
+palavra alvo;
+inteira indiceEncontrado;
+inteira inicio;
+inteira fim;
+inteira meio;
+inteira pesoNoMeio;
+inteira pesoBuscado;
+bool cpfOk;
+bool combinacaoLogica;
+inteira somaPesos;
+inteira mediaPesos;
+inteira candidato;
+inteira qtdPrimos;
+bool candidatoPrimo;
+inteira maiorDistancia;
+inteira distanciaAtual;
+inteira linhaMax;
+inteira colunaMax;
+inteira fibResultado;
+inteira potResultado;
+inteira qtdVizinhoMaisPesado;
+inteira docAtual;
+bool cpfAtualValido;
+inteira qtdCpfValidos;
+duplocarpado somaComoDuplo;
+duplocarpado raizDaSoma;
+inteira baixo;
+inteira alto;
+inteira pivo;
+inteira p;
+inteira q;
+inteira valorK;
+inteira maiorPeso;
+
+palavra vet{18} nomes;
+inteira vet{18} pesos;
+inteira vet{18} idades;
+palavra vet{18} especies;
+
+palavra vet{10} nomesCuidadores;
+inteira vet{10} documentos;
+inteira vet{10} idadesCuidadores;
+
+inteira vet{18} primosEncontrados;
+
+inteira vet{16} distanciasLinha0;
+inteira vet{16} distanciasLinha1;
+inteira vet{16} distanciasLinha2;
+inteira vet{16} distanciasLinha3;
+inteira vet{16} distanciasLinha4;
+inteira vet{16} distanciasLinha5;
+inteira vet{16} distanciasLinha6;
+inteira vet{16} distanciasLinha7;
+inteira vet{16} distanciasLinha8;
+inteira vet{16} distanciasLinha9;
+inteira vet{16} distanciasLinha10;
+inteira vet{16} distanciasLinha11;
+inteira vet{16} distanciasLinha12;
+inteira vet{16} distanciasLinha13;
+inteira vet{16} distanciasLinha14;
+inteira vet{16} distanciasLinha15;
+
+tamanho receba 18;
+limiteSort receba tamanho - 1;
+qtdCuidadores receba 10;
+
+nomes{0} receba "Simba0";
+especies{0} receba "leao";
+pesos{0} receba 190;
+idades{0} receba 1;
+
+nomes{1} receba "Baloo1";
+especies{1} receba "urso";
+pesos{1} receba 260;
+idades{1} receba 2;
+
+nomes{2} receba "Zazu2";
+especies{2} receba "tucano";
+pesos{2} receba 2;
+idades{2} receba 3;
+
+nomes{3} receba "Rajah3";
+especies{3} receba "tigre";
+pesos{3} receba 210;
+idades{3} receba 4;
+
+nomes{4} receba "Dumbo4";
+especies{4} receba "elefante";
+pesos{4} receba 540;
+idades{4} receba 5;
+
+nomes{5} receba "Marlin5";
+especies{5} receba "peixe";
+pesos{5} receba 4;
+idades{5} receba 6;
+
+nomes{6} receba "Melman6";
+especies{6} receba "girafa";
+pesos{6} receba 600;
+idades{6} receba 7;
+
+nomes{7} receba "Skipper7";
+especies{7} receba "pinguim";
+pesos{7} receba 6;
+idades{7} receba 8;
+
+nomes{8} receba "Akela8";
+especies{8} receba "lobo";
+pesos{8} receba 60;
+idades{8} receba 9;
+
+nomes{9} receba "Rex9";
+especies{9} receba "macaco";
+pesos{9} receba 40;
+idades{9} receba 10;
+
+nomes{10} receba "Stripes10";
+especies{10} receba "zebra";
+pesos{10} receba 320;
+idades{10} receba 11;
+
+nomes{11} receba "Bubbles11";
+especies{11} receba "hipopotamo";
+pesos{11} receba 1400;
+idades{11} receba 12;
+
+nomes{12} receba "Tango12";
+especies{12} receba "coala";
+pesos{12} receba 20;
+idades{12} receba 13;
+
+nomes{13} receba "Kiara13";
+especies{13} receba "canguru";
+pesos{13} receba 60;
+idades{13} receba 14;
+
+nomes{14} receba "Nala14";
+especies{14} receba "raposa";
+pesos{14} receba 22;
+idades{14} receba 15;
+
+nomes{15} receba "Timon15";
+especies{15} receba "coruja";
+pesos{15} receba 2;
+idades{15} receba 1;
+
+nomes{16} receba "Pumba16";
+especies{16} receba "jacare";
+pesos{16} receba 180;
+idades{16} receba 2;
+
+nomes{17} receba "Alex17";
+especies{17} receba "lontra";
+pesos{17} receba 40;
+idades{17} receba 3;
+
+nomesCuidadores{0} receba "Ana Paula";
+documentos{0} receba 12345678901;
+idadesCuidadores{0} receba 25;
+
+nomesCuidadores{1} receba "Bruno Alves";
+documentos{1} receba 98765432100;
+idadesCuidadores{1} receba 26;
+
+nomesCuidadores{2} receba "Carla Dias";
+documentos{2} receba 11122233344;
+idadesCuidadores{2} receba 27;
+
+nomesCuidadores{3} receba "Diego Souza";
+documentos{3} receba 55566677788;
+idadesCuidadores{3} receba 28;
+
+nomesCuidadores{4} receba "Elisa Nunes";
+documentos{4} receba 22233344455;
+idadesCuidadores{4} receba 29;
+
+nomesCuidadores{5} receba "Fabio Lima";
+documentos{5} receba 33344455566;
+idadesCuidadores{5} receba 30;
+
+nomesCuidadores{6} receba "Gisele Reis";
+documentos{6} receba 44455566677;
+idadesCuidadores{6} receba 31;
+
+nomesCuidadores{7} receba "Hugo Castro";
+documentos{7} receba 66677788899;
+idadesCuidadores{7} receba 32;
+
+nomesCuidadores{8} receba "Ines Farias";
+documentos{8} receba 77788899900;
+idadesCuidadores{8} receba 33;
+
+nomesCuidadores{9} receba "Joao Prado";
+documentos{9} receba 88899900011;
+idadesCuidadores{9} receba 34;
+
+distanciasLinha0{0} receba 1;
+distanciasLinha0{1} receba 4;
+distanciasLinha0{2} receba 7;
+distanciasLinha0{3} receba 10;
+distanciasLinha0{4} receba 13;
+distanciasLinha0{5} receba 16;
+distanciasLinha0{6} receba 19;
+distanciasLinha0{7} receba 22;
+distanciasLinha0{8} receba 25;
+distanciasLinha0{9} receba 28;
+distanciasLinha0{10} receba 31;
+distanciasLinha0{11} receba 34;
+distanciasLinha0{12} receba 37;
+distanciasLinha0{13} receba 40;
+distanciasLinha0{14} receba 43;
+distanciasLinha0{15} receba 46;
+
+distanciasLinha1{0} receba 4;
+distanciasLinha1{1} receba 1;
+distanciasLinha1{2} receba 4;
+distanciasLinha1{3} receba 7;
+distanciasLinha1{4} receba 10;
+distanciasLinha1{5} receba 13;
+distanciasLinha1{6} receba 16;
+distanciasLinha1{7} receba 19;
+distanciasLinha1{8} receba 22;
+distanciasLinha1{9} receba 25;
+distanciasLinha1{10} receba 28;
+distanciasLinha1{11} receba 31;
+distanciasLinha1{12} receba 34;
+distanciasLinha1{13} receba 37;
+distanciasLinha1{14} receba 40;
+distanciasLinha1{15} receba 43;
+
+distanciasLinha2{0} receba 7;
+distanciasLinha2{1} receba 4;
+distanciasLinha2{2} receba 1;
+distanciasLinha2{3} receba 4;
+distanciasLinha2{4} receba 7;
+distanciasLinha2{5} receba 10;
+distanciasLinha2{6} receba 13;
+distanciasLinha2{7} receba 16;
+distanciasLinha2{8} receba 19;
+distanciasLinha2{9} receba 22;
+distanciasLinha2{10} receba 25;
+distanciasLinha2{11} receba 28;
+distanciasLinha2{12} receba 31;
+distanciasLinha2{13} receba 34;
+distanciasLinha2{14} receba 37;
+distanciasLinha2{15} receba 40;
+
+distanciasLinha3{0} receba 10;
+distanciasLinha3{1} receba 7;
+distanciasLinha3{2} receba 4;
+distanciasLinha3{3} receba 1;
+distanciasLinha3{4} receba 4;
+distanciasLinha3{5} receba 7;
+distanciasLinha3{6} receba 10;
+distanciasLinha3{7} receba 13;
+distanciasLinha3{8} receba 16;
+distanciasLinha3{9} receba 19;
+distanciasLinha3{10} receba 22;
+distanciasLinha3{11} receba 25;
+distanciasLinha3{12} receba 28;
+distanciasLinha3{13} receba 31;
+distanciasLinha3{14} receba 34;
+distanciasLinha3{15} receba 37;
+
+distanciasLinha4{0} receba 13;
+distanciasLinha4{1} receba 10;
+distanciasLinha4{2} receba 7;
+distanciasLinha4{3} receba 4;
+distanciasLinha4{4} receba 1;
+distanciasLinha4{5} receba 4;
+distanciasLinha4{6} receba 7;
+distanciasLinha4{7} receba 10;
+distanciasLinha4{8} receba 13;
+distanciasLinha4{9} receba 16;
+distanciasLinha4{10} receba 19;
+distanciasLinha4{11} receba 22;
+distanciasLinha4{12} receba 25;
+distanciasLinha4{13} receba 28;
+distanciasLinha4{14} receba 31;
+distanciasLinha4{15} receba 34;
+
+distanciasLinha5{0} receba 16;
+distanciasLinha5{1} receba 13;
+distanciasLinha5{2} receba 10;
+distanciasLinha5{3} receba 7;
+distanciasLinha5{4} receba 4;
+distanciasLinha5{5} receba 1;
+distanciasLinha5{6} receba 4;
+distanciasLinha5{7} receba 7;
+distanciasLinha5{8} receba 10;
+distanciasLinha5{9} receba 13;
+distanciasLinha5{10} receba 16;
+distanciasLinha5{11} receba 19;
+distanciasLinha5{12} receba 22;
+distanciasLinha5{13} receba 25;
+distanciasLinha5{14} receba 28;
+distanciasLinha5{15} receba 31;
+
+distanciasLinha6{0} receba 19;
+distanciasLinha6{1} receba 16;
+distanciasLinha6{2} receba 13;
+distanciasLinha6{3} receba 10;
+distanciasLinha6{4} receba 7;
+distanciasLinha6{5} receba 4;
+distanciasLinha6{6} receba 1;
+distanciasLinha6{7} receba 4;
+distanciasLinha6{8} receba 7;
+distanciasLinha6{9} receba 10;
+distanciasLinha6{10} receba 13;
+distanciasLinha6{11} receba 16;
+distanciasLinha6{12} receba 19;
+distanciasLinha6{13} receba 22;
+distanciasLinha6{14} receba 25;
+distanciasLinha6{15} receba 28;
+
+distanciasLinha7{0} receba 22;
+distanciasLinha7{1} receba 19;
+distanciasLinha7{2} receba 16;
+distanciasLinha7{3} receba 13;
+distanciasLinha7{4} receba 10;
+distanciasLinha7{5} receba 7;
+distanciasLinha7{6} receba 4;
+distanciasLinha7{7} receba 1;
+distanciasLinha7{8} receba 4;
+distanciasLinha7{9} receba 7;
+distanciasLinha7{10} receba 10;
+distanciasLinha7{11} receba 13;
+distanciasLinha7{12} receba 16;
+distanciasLinha7{13} receba 19;
+distanciasLinha7{14} receba 22;
+distanciasLinha7{15} receba 25;
+
+distanciasLinha8{0} receba 25;
+distanciasLinha8{1} receba 22;
+distanciasLinha8{2} receba 19;
+distanciasLinha8{3} receba 16;
+distanciasLinha8{4} receba 13;
+distanciasLinha8{5} receba 10;
+distanciasLinha8{6} receba 7;
+distanciasLinha8{7} receba 4;
+distanciasLinha8{8} receba 1;
+distanciasLinha8{9} receba 4;
+distanciasLinha8{10} receba 7;
+distanciasLinha8{11} receba 10;
+distanciasLinha8{12} receba 13;
+distanciasLinha8{13} receba 16;
+distanciasLinha8{14} receba 19;
+distanciasLinha8{15} receba 22;
+
+distanciasLinha9{0} receba 28;
+distanciasLinha9{1} receba 25;
+distanciasLinha9{2} receba 22;
+distanciasLinha9{3} receba 19;
+distanciasLinha9{4} receba 16;
+distanciasLinha9{5} receba 13;
+distanciasLinha9{6} receba 10;
+distanciasLinha9{7} receba 7;
+distanciasLinha9{8} receba 4;
+distanciasLinha9{9} receba 1;
+distanciasLinha9{10} receba 4;
+distanciasLinha9{11} receba 7;
+distanciasLinha9{12} receba 10;
+distanciasLinha9{13} receba 13;
+distanciasLinha9{14} receba 16;
+distanciasLinha9{15} receba 19;
+
+distanciasLinha10{0} receba 31;
+distanciasLinha10{1} receba 28;
+distanciasLinha10{2} receba 25;
+distanciasLinha10{3} receba 22;
+distanciasLinha10{4} receba 19;
+distanciasLinha10{5} receba 16;
+distanciasLinha10{6} receba 13;
+distanciasLinha10{7} receba 10;
+distanciasLinha10{8} receba 7;
+distanciasLinha10{9} receba 4;
+distanciasLinha10{10} receba 1;
+distanciasLinha10{11} receba 4;
+distanciasLinha10{12} receba 7;
+distanciasLinha10{13} receba 10;
+distanciasLinha10{14} receba 13;
+distanciasLinha10{15} receba 16;
+
+distanciasLinha11{0} receba 34;
+distanciasLinha11{1} receba 31;
+distanciasLinha11{2} receba 28;
+distanciasLinha11{3} receba 25;
+distanciasLinha11{4} receba 22;
+distanciasLinha11{5} receba 19;
+distanciasLinha11{6} receba 16;
+distanciasLinha11{7} receba 13;
+distanciasLinha11{8} receba 10;
+distanciasLinha11{9} receba 7;
+distanciasLinha11{10} receba 4;
+distanciasLinha11{11} receba 1;
+distanciasLinha11{12} receba 4;
+distanciasLinha11{13} receba 7;
+distanciasLinha11{14} receba 10;
+distanciasLinha11{15} receba 13;
+
+distanciasLinha12{0} receba 37;
+distanciasLinha12{1} receba 34;
+distanciasLinha12{2} receba 31;
+distanciasLinha12{3} receba 28;
+distanciasLinha12{4} receba 25;
+distanciasLinha12{5} receba 22;
+distanciasLinha12{6} receba 19;
+distanciasLinha12{7} receba 16;
+distanciasLinha12{8} receba 13;
+distanciasLinha12{9} receba 10;
+distanciasLinha12{10} receba 7;
+distanciasLinha12{11} receba 4;
+distanciasLinha12{12} receba 1;
+distanciasLinha12{13} receba 4;
+distanciasLinha12{14} receba 7;
+distanciasLinha12{15} receba 10;
+
+distanciasLinha13{0} receba 40;
+distanciasLinha13{1} receba 37;
+distanciasLinha13{2} receba 34;
+distanciasLinha13{3} receba 31;
+distanciasLinha13{4} receba 28;
+distanciasLinha13{5} receba 25;
+distanciasLinha13{6} receba 22;
+distanciasLinha13{7} receba 19;
+distanciasLinha13{8} receba 16;
+distanciasLinha13{9} receba 13;
+distanciasLinha13{10} receba 10;
+distanciasLinha13{11} receba 7;
+distanciasLinha13{12} receba 4;
+distanciasLinha13{13} receba 1;
+distanciasLinha13{14} receba 4;
+distanciasLinha13{15} receba 7;
+
+distanciasLinha14{0} receba 43;
+distanciasLinha14{1} receba 40;
+distanciasLinha14{2} receba 37;
+distanciasLinha14{3} receba 34;
+distanciasLinha14{4} receba 31;
+distanciasLinha14{5} receba 28;
+distanciasLinha14{6} receba 25;
+distanciasLinha14{7} receba 22;
+distanciasLinha14{8} receba 19;
+distanciasLinha14{9} receba 16;
+distanciasLinha14{10} receba 13;
+distanciasLinha14{11} receba 10;
+distanciasLinha14{12} receba 7;
+distanciasLinha14{13} receba 4;
+distanciasLinha14{14} receba 1;
+distanciasLinha14{15} receba 4;
+
+distanciasLinha15{0} receba 46;
+distanciasLinha15{1} receba 43;
+distanciasLinha15{2} receba 40;
+distanciasLinha15{3} receba 37;
+distanciasLinha15{4} receba 34;
+distanciasLinha15{5} receba 31;
+distanciasLinha15{6} receba 28;
+distanciasLinha15{7} receba 25;
+distanciasLinha15{8} receba 22;
+distanciasLinha15{9} receba 19;
+distanciasLinha15{10} receba 16;
+distanciasLinha15{11} receba 13;
+distanciasLinha15{12} receba 10;
+distanciasLinha15{13} receba 7;
+distanciasLinha15{14} receba 4;
+distanciasLinha15{15} receba 1;
+
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+repete ( j receba 0 , j < limiteSort , j receba j + 1 ) edai
+[
+pesoAtual receba pesos{j};
+pesoProximo receba pesos{j + 1};
+cond ( pesoAtual > pesoProximo ) edai
+[
+tempPeso receba pesos{j};
+pesos{j} receba pesos{j + 1};
+pesos{j + 1} receba tempPeso;
+
+tempNome receba nomes{j};
+nomes{j} receba nomes{j + 1};
+nomes{j + 1} receba tempNome;
+
+tempIdade receba idades{j};
+idades{j} receba idades{j + 1};
+idades{j + 1} receba tempIdade;
+
+tempEspecie receba especies{j};
+especies{j} receba especies{j + 1};
+especies{j + 1} receba tempEspecie;
+]
+]
+]
+
+pesoBuscado receba pesos{0};
+inicio receba 0;
+fim receba limiteSort;
+indiceEncontrado receba 0 - 1;
+durante ( fim > inicio ) edai
+[
+meio receba inicio + fim;
+meio receba meio // 2;
+pesoNoMeio receba pesos{meio};
+cond ( pesoNoMeio == pesoBuscado ) edai
+[
+indiceEncontrado receba meio;
+inicio receba fim + 1;
+]
+casocontrario edai
+[
+cond ( pesoNoMeio < pesoBuscado ) edai
+[
+inicio receba meio + 1;
+]
+casocontrario edai
+[
+fim receba meio - 1;
+]
+]
+]
+pesoNoMeio receba pesos{inicio};
+cond ( pesoNoMeio == pesoBuscado ) edai
+[
+indiceEncontrado receba inicio;
+]
+
+qtdPrimos receba 0;
+repete ( candidato receba 2 , candidato < 50 , candidato receba candidato + 1 ) edai
+[
+candidatoPrimo receba ehPrimo(candidato);
+cond ( candidatoPrimo == VER ) edai
+[
+cond ( qtdPrimos < tamanho ) edai
+[
+primosEncontrados{qtdPrimos} receba candidato;
+qtdPrimos receba qtdPrimos + 1;
+]
+]
+]
+
+qtdCpfValidos receba 0;
+repete ( i receba 0 , i < qtdCuidadores , i receba i + 1 ) edai
+[
+docAtual receba documentos{i};
+cpfAtualValido receba validarCpf(docAtual);
+cond ( cpfAtualValido == VER ) edai
+[
+qtdCpfValidos receba qtdCpfValidos + 1;
+]
+]
+
+combinacaoLogica receba verificarFaixaEtaria(idadesCuidadores{0}, 18, 60);
+
+maiorDistancia receba 0;
+linhaMax receba 0;
+colunaMax receba 0;
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha0{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 0;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha1{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 1;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha2{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 2;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha3{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 3;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha4{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 4;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha5{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 5;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha6{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 6;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha7{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 7;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha8{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 8;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha9{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 9;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha10{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 10;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha11{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 11;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha12{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 12;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha13{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 13;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha14{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 14;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 16 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha15{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 15;
+colunaMax receba j;
+]
+]
+
+somaPesos receba 0;
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+somaPesos receba somaPesos + pesos{i};
+]
+mediaPesos receba somaPesos // tamanho;
+somaComoDuplo receba somaPesos;
+raizDaSoma receba raiz(somaComoDuplo);
+
+qtdVizinhoMaisPesado receba 0;
+repete ( i receba 0 , i < limiteSort , i receba i + 1 ) edai
+[
+pesoAtual receba pesos{i};
+pesoProximo receba pesos{i + 1};
+cond ( pesoProximo > pesoAtual ) edai
+[
+qtdVizinhoMaisPesado receba qtdVizinhoMaisPesado + 1;
+]
+]
+
+fibResultado receba fibonacci(10);
+potResultado receba 2 ^ 8;
+
+alvo receba "Rajah3";
+indiceEncontrado receba 0 - 1;
+i receba 0;
+durante ( i < tamanho ) edai
+[
+nomeAtual receba nomes{i};
+cond ( nomeAtual == alvo ) edai
+[
+indiceEncontrado receba i;
+i receba tamanho;
+]
+casocontrario edai
+[
+i receba i + 1;
+]
+]
+
+baixo receba 0;
+alto receba limiteSort;
+p receba baixo;
+durante ( alto > p ) edai
+[
+pivo receba pesos{alto};
+q receba p - 1;
+repete ( k receba p , k < alto , k receba k + 1 ) edai
+[
+valorK receba pesos{k};
+cond ( valorK < pivo ) edai
+[
+q receba q + 1;
+tempPeso receba pesos{q};
+pesos{q} receba pesos{k};
+pesos{k} receba tempPeso;
+]
+]
+q receba q + 1;
+tempPeso receba pesos{q};
+pesos{q} receba pesos{alto};
+pesos{alto} receba tempPeso;
+p receba p + 1;
+]
+
+maiorPeso receba pesos{0};
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+pesoAtual receba pesos{i};
+maiorPeso receba maximoDoisInteiros(maiorPeso, pesoAtual);
+]
+
+respost mediaPesos;
+]

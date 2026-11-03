@@ -1,0 +1,58 @@
+outrafuncao inteira fatorial(inteira n) @
+[
+inteira resultado;
+cond ( n < 2 ) edai
+[
+resultado receba 1;
+]
+casocontrario edai
+[
+resultado receba n * fatorial(n - 1);
+]
+respost resultado;
+]
+outrafuncao bool ehPrimo(inteira n) @
+[
+bool primo;
+inteira divisor;
+inteira quociente;
+inteira restoDivisao;
+primo receba VER;
+cond ( n < 2 ) edai
+[
+primo receba FAL;
+]
+divisor receba 2;
+durante ( divisor < n ) edai
+[
+quociente receba n // divisor;
+restoDivisao receba quociente * divisor;
+restoDivisao receba n - restoDivisao;
+cond ( restoDivisao == 0 ) edai
+[
+primo receba FAL;
+]
+divisor receba divisor + 1;
+]
+respost primo;
+]
+inteira principal() @
+[
+inteira contador;
+inteira limite;
+inteira fatorialDeCinco;
+inteira quantidadePrimos;
+bool primo;
+limite receba 15;
+quantidadePrimos receba 0;
+repete ( contador receba 2 , contador < limite , contador receba contador + 1 ) edai
+[
+primo receba ehPrimo(contador);
+cond ( primo == VER ) edai
+[
+quantidadePrimos receba quantidadePrimos + 1;
+]
+]
+fatorialDeCinco receba fatorial(5);
+respost fatorialDeCinco;
+]

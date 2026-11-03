@@ -1,5 +1,10 @@
 #include "token.h"
 
+/*
+ * Infraestrutura da lista dinamica de tokens. Cada lexema e copiado para que
+ * a TokenList tenha ciclo de vida independente do buffer original do lexer.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -105,6 +110,7 @@ const char *token_type_name(TokenType type) {
         case TOKEN_SEMICOLON: return "SEMICOLON";
         case TOKEN_COMMA: return "COMMA";
         case TOKEN_AT: return "AT";
+        case TOKEN_DOT: return "DOT";
         default: return "UNKNOWN";
     }
 }

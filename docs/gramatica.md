@@ -187,3 +187,23 @@ entrada_saida   = "entrada", "(", lvalue, ")", ";"
 ```
 
 No lexer, `entrada` e `saida` continuam sendo `IDENTIFIER`. O parser as reconhece pela produção geral de `chamada`; a distinção e as restrições são aplicadas somente pelo analisador semântico.
+
+
+## 12. Revisões após avaliação
+
+Condições usam a gramática geral de expressão:
+
+```ebnf
+condicao = expressao ;
+```
+
+A fase semântica exige resultado `bool`.
+
+Os programas de nível também introduzem:
+
+```ebnf
+declaracao_registro = IDENTIFIER, IDENTIFIER, { ",", IDENTIFIER }, ";" ;
+acesso_campo        = IDENTIFIER, ".", IDENTIFIER ;
+```
+
+O primeiro identificador da declaração precisa nomear um `registro` existente; essa é uma regra semântica.

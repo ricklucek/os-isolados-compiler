@@ -1,0 +1,6 @@
+inteira principal() @
+[
+    inteira vet{3} valores;
+    valores{3} receba 10;
+    respost 0;
+]

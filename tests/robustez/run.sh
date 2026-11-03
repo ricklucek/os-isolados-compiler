@@ -199,7 +199,7 @@ run_expect 2 "bytes de controle sao rejeitados sem crash" "$BIN" "$BYTES"
 
 EMPTY="$ROOT/vazio.mac"
 : > "$EMPTY"
-run_not_signal "arquivo vazio nao causa crash ou loop" "$BIN" "$EMPTY"
+run_expect 6 "arquivo vazio e rejeitado pela ausencia de principal" "$BIN" "$EMPTY"
 
 TRUNCATED="$ROOT/truncado.mac"
 cat > "$TRUNCATED" <<'EOF'
@@ -211,6 +211,31 @@ inteira principal() @
         x receba 1;
 EOF
 run_not_signal "arquivo truncado finaliza de forma controlada" "$BIN" "$TRUNCATED"
+
+DEEP_PARENS="$ROOT/parenteses-profundos.mac"
+{
+    echo "inteira principal() @"
+    echo "["
+    printf "    inteira x;\n    x receba "
+    i=1
+    while [ "$i" -le 2000 ]; do printf "("; i=$((i + 1)); done
+    printf "1"
+    i=1
+    while [ "$i" -le 2000 ]; do printf ")"; i=$((i + 1)); done
+    printf ";\n    respost 0;\n]\n"
+} > "$DEEP_PARENS"
+run_expect 4 "parenteses patologicamente profundos geram erro controlado" "$BIN" "$DEEP_PARENS"
+
+LONG_EXPR="$ROOT/expressao-muito-longa.mac"
+{
+    echo "inteira principal() @"
+    echo "["
+    printf "    inteira x;\n    x receba 1"
+    i=1
+    while [ "$i" -le 3000 ]; do printf " + 1"; i=$((i + 1)); done
+    printf ";\n    respost x;\n]\n"
+} > "$LONG_EXPR"
+run_expect 4 "expressao patologicamente longa gera erro controlado" "$BIN" "$LONG_EXPR"
 
 printf "\nRobustez: %d teste(s) OK, %d falha(s).\n" "$PASS" "$FAIL"
 

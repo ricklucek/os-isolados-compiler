@@ -123,3 +123,10 @@ make docker-sanitize
 ```
 
 O bind mount mantém o código do host e do container sincronizado; reconstruir a imagem só é necessário quando o próprio Dockerfile ou suas dependências mudarem.
+
+
+## 8. Limites defensivos e recuperação de controle
+
+O parser passou a limitar profundidade sintática e complexidade de expressões para transformar entradas patológicas em erro sintático controlado. A liberação da AST usa pilha explícita para não depender da pilha C em árvores profundas.
+
+Quando o cabeçalho de `cond`, `durante` ou `repete` é malformado, a recuperação pula o bloco pertencente à construção inválida antes de retomar o bloco externo. Isso evita a cascata em que comandos internos eram reinterpretados como nível global.

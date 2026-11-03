@@ -1,5 +1,12 @@
 #include "semantic.h"
 
+/*
+ * Analise semantica sobre a AST.
+ * A fase mantem tabela de simbolos/escopos, infere tipos e acumula erros
+ * independentes sempre que e seguro continuar a travessia.
+ */
+
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +16,7 @@
 
 typedef struct {
     SymbolTable symbols;
+    const AstNode *program;
     size_t error_count;
     int memory_error;
     FILE *error_stream;
@@ -72,7 +80,8 @@ static int is_builtin_io_name(const char *name) {
 static int declare_symbol(SemanticContext *context, const AstNode *node,
                           const char *name, SymbolKind kind, LangType type,
                           size_t vector_size, const LangType *parameter_types,
-                          size_t parameter_count) {
+                          size_t parameter_count,
+                          const char *record_type_name) {
     SymbolDeclareStatus status;
     const Symbol *existing;
 
@@ -91,7 +100,7 @@ static int declare_symbol(SemanticContext *context, const AstNode *node,
 
     status = symbol_table_declare(
         &context->symbols, name, kind, type, vector_size, parameter_types,
-        parameter_count, node != NULL ? node->line : 0,
+        parameter_count, record_type_name, node != NULL ? node->line : 0,
         node != NULL ? node->column : 0, NULL);
 
     if (status == SYMBOL_DECLARE_OK) return 1;
@@ -137,7 +146,7 @@ static void predeclare_callable(SemanticContext *context,
 
     if (node->kind == AST_RECORD) {
         declare_symbol(context, node, node->lexeme, SYMBOL_RECORD,
-                       LANG_TYPE_ERROR, 0U, NULL, 0U);
+                       LANG_TYPE_RECORD, 0U, NULL, 0U, node->lexeme);
         return;
     }
 
@@ -162,7 +171,7 @@ static void predeclare_callable(SemanticContext *context,
     return_type = lang_type_from_token(node->token_type);
     kind = node->kind == AST_PRINCIPAL ? SYMBOL_PRINCIPAL : SYMBOL_FUNCTION;
     declare_symbol(context, node, node->lexeme, kind, return_type, 0U,
-                   parameter_types, parameter_count);
+                   parameter_types, parameter_count, NULL);
     free(parameter_types);
 }
 
@@ -200,15 +209,30 @@ static void analyze_declaration(SemanticContext *context,
                                 const AstNode *node) {
     LangType type;
     SymbolKind kind;
+    const char *record_type_name = NULL;
     size_t first_identifier;
     size_t vector_size = 0U;
     size_t i;
 
     if (node == NULL || context->memory_error) return;
-    type = lang_type_from_token(node->token_type);
-    if (type == LANG_TYPE_ERROR || type == LANG_TYPE_VAZIO) {
-        semantic_error(context, node, "declaracao possui tipo invalido");
-        return;
+
+    if (node->token_type == TOKEN_IDENTIFIER && node->lexeme != NULL) {
+        const Symbol *record =
+            symbol_table_lookup_global(&context->symbols, node->lexeme);
+        if (record == NULL || record->kind != SYMBOL_RECORD) {
+            semantic_error(context, node,
+                           "tipo de registro '%s' nao foi declarado",
+                           node->lexeme);
+            return;
+        }
+        type = LANG_TYPE_RECORD;
+        record_type_name = node->lexeme;
+    } else {
+        type = lang_type_from_token(node->token_type);
+        if (type == LANG_TYPE_ERROR || type == LANG_TYPE_VAZIO) {
+            semantic_error(context, node, "declaracao possui tipo invalido");
+            return;
+        }
     }
 
     kind = node->kind == AST_VECTOR_DECL ? SYMBOL_VECTOR : SYMBOL_VARIABLE;
@@ -220,7 +244,7 @@ static void analyze_declaration(SemanticContext *context,
         const AstNode *identifier = node->children[i];
         if (identifier == NULL || identifier->kind != AST_IDENTIFIER) continue;
         declare_symbol(context, identifier, identifier->lexeme, kind, type,
-                       vector_size, NULL, 0U);
+                       vector_size, NULL, 0U, record_type_name);
     }
 }
 
@@ -234,6 +258,91 @@ static const Symbol *lookup_value_symbol(SemanticContext *context,
         return NULL;
     }
     return symbol;
+}
+
+static const AstNode *find_record_definition(
+    const SemanticContext *context, const char *name) {
+    size_t i;
+    if (context == NULL || context->program == NULL || name == NULL)
+        return NULL;
+
+    for (i = 0U; i < context->program->child_count; ++i) {
+        const AstNode *node = context->program->children[i];
+        if (node != NULL && node->kind == AST_RECORD &&
+            node->lexeme != NULL && strcmp(node->lexeme, name) == 0)
+            return node;
+    }
+    return NULL;
+}
+
+static const AstNode *find_record_field(const AstNode *record,
+                                        const char *field_name) {
+    size_t i;
+    if (record == NULL || field_name == NULL) return NULL;
+
+    for (i = 0U; i < record->child_count; ++i) {
+        const AstNode *decl = record->children[i];
+        size_t j;
+        if (decl == NULL ||
+            (decl->kind != AST_VAR_DECL && decl->kind != AST_VECTOR_DECL))
+            continue;
+
+        for (j = vector_decl_first_identifier(decl);
+             j < decl->child_count; ++j) {
+            const AstNode *identifier = decl->children[j];
+            if (identifier != NULL && identifier->kind == AST_IDENTIFIER &&
+                identifier->lexeme != NULL &&
+                strcmp(identifier->lexeme, field_name) == 0)
+                return decl;
+        }
+    }
+    return NULL;
+}
+
+static LangType evaluate_field_access(SemanticContext *context,
+                                      const AstNode *node) {
+    const Symbol *base;
+    const AstNode *field_node;
+    const AstNode *record;
+    const AstNode *field_decl;
+
+    if (node == NULL || node->child_count == 0U ||
+        node->children[0] == NULL)
+        return LANG_TYPE_ERROR;
+
+    field_node = node->children[0];
+    base = lookup_value_symbol(context, node, node->lexeme);
+    if (base == NULL) return LANG_TYPE_ERROR;
+
+    if ((base->kind != SYMBOL_VARIABLE && base->kind != SYMBOL_PARAMETER) ||
+        base->type != LANG_TYPE_RECORD || base->record_type_name == NULL) {
+        semantic_error(context, node,
+                       "'%s' nao e uma variavel de registro",
+                       base->name);
+        return LANG_TYPE_ERROR;
+    }
+
+    record = find_record_definition(context, base->record_type_name);
+    field_decl = find_record_field(
+        record, field_node->lexeme != NULL ? field_node->lexeme : "");
+
+    if (field_decl == NULL) {
+        semantic_error(context, field_node,
+                       "registro '%s' nao possui campo '%s'",
+                       base->record_type_name,
+                       field_node->lexeme != NULL
+                           ? field_node->lexeme : "<sem-nome>");
+        return LANG_TYPE_ERROR;
+    }
+
+    if (field_decl->kind == AST_VECTOR_DECL) {
+        semantic_error(context, field_node,
+                       "campo vetorial '%s.%s' exige sintaxe de indice propria",
+                       base->name, field_node->lexeme);
+        return LANG_TYPE_ERROR;
+    }
+
+    return lang_type_from_token(field_decl->token_type);
 }
 
 static LangType evaluate_identifier(SemanticContext *context,
@@ -253,7 +362,38 @@ static LangType evaluate_identifier(SemanticContext *context,
                        symbol->name, symbol_kind_name(symbol->kind));
         return LANG_TYPE_ERROR;
     }
+    if (symbol->type == LANG_TYPE_RECORD) {
+        semantic_error(context, node,
+                       "registro '%s' deve ser acessado por um campo",
+                       symbol->name);
+        return LANG_TYPE_ERROR;
+    }
     return symbol->type;
+}
+
+static int constant_integer_value(const AstNode *node,
+                                  long long *out_value) {
+    char *end = NULL;
+    long long value;
+
+    if (node == NULL || out_value == NULL) return 0;
+
+    if (node->kind == AST_INTEGER_LITERAL && node->lexeme != NULL) {
+        errno = 0;
+        value = strtoll(node->lexeme, &end, 10);
+        if (errno != 0 || end == node->lexeme || *end != '\0') return 0;
+        *out_value = value;
+        return 1;
+    }
+
+    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
+        (node->token_type == TOKEN_MINUS || node->token_type == TOKEN_PLUS)) {
+        if (!constant_integer_value(node->children[0], &value)) return 0;
+        *out_value = node->token_type == TOKEN_MINUS ? -value : value;
+        return 1;
+    }
+
+    return 0;
 }
 
 static LangType evaluate_vector_access(SemanticContext *context,
@@ -281,6 +421,21 @@ static LangType evaluate_vector_access(SemanticContext *context,
                        symbol->name);
         return LANG_TYPE_ERROR;
     }
+
+    if (node->child_count > 0U && index_type == LANG_TYPE_INTEIRA) {
+        long long constant_index;
+        if (constant_integer_value(node->children[0], &constant_index) &&
+            (constant_index < 0 ||
+             (unsigned long long)constant_index >=
+                 (unsigned long long)symbol->vector_size)) {
+            semantic_error(context, node->children[0],
+                           "indice constante %lld fora dos limites do vetor '%s' (0..%zu)",
+                           constant_index, symbol->name,
+                           symbol->vector_size == 0U ? 0U
+                                                     : symbol->vector_size - 1U);
+        }
+    }
+
     return symbol->type;
 }
 
@@ -498,6 +653,7 @@ static LangType evaluate_expression(SemanticContext *context,
         case AST_BOOL_LITERAL: return LANG_TYPE_BOOL;
         case AST_IDENTIFIER: return evaluate_identifier(context, node);
         case AST_VECTOR_ACCESS: return evaluate_vector_access(context, node);
+        case AST_FIELD_ACCESS: return evaluate_field_access(context, node);
         case AST_CALL: return evaluate_call(context, node);
         case AST_BINARY_EXPR: return evaluate_binary(context, node);
         case AST_UNARY_EXPR: return evaluate_unary(context, node);
@@ -517,6 +673,8 @@ static LangType evaluate_lvalue(SemanticContext *context,
 
     if (node->kind == AST_VECTOR_ACCESS)
         return evaluate_vector_access(context, node);
+    if (node->kind == AST_FIELD_ACCESS)
+        return evaluate_field_access(context, node);
 
     if (node->kind != AST_IDENTIFIER) {
         semantic_error(context, node,
@@ -723,6 +881,52 @@ static const AstNode *function_body(const AstNode *function) {
     return NULL;
 }
 
+static int statement_guarantees_return(const AstNode *node);
+
+static int block_guarantees_return(const AstNode *block) {
+    size_t i;
+    if (block == NULL || block->kind != AST_BLOCK) return 0;
+
+    for (i = 0U; i < block->child_count; ++i) {
+        if (statement_guarantees_return(block->children[i])) return 1;
+    }
+    return 0;
+}
+
+static int statement_guarantees_return(const AstNode *node) {
+    size_t i;
+    int saw_else = 0;
+
+    if (node == NULL) return 0;
+    if (node->kind == AST_RETURN) return 1;
+    if (node->kind == AST_BLOCK) return block_guarantees_return(node);
+
+    if (node->kind != AST_IF || node->child_count < 3U)
+        return 0;
+
+    if (!block_guarantees_return(node->children[1])) return 0;
+
+    for (i = 2U; i < node->child_count; ++i) {
+        const AstNode *branch = node->children[i];
+        if (branch == NULL) return 0;
+
+        if (branch->kind == AST_ELSE_IF) {
+            if (branch->child_count < 2U ||
+                !block_guarantees_return(branch->children[1]))
+                return 0;
+        } else if (branch->kind == AST_ELSE) {
+            if (branch->child_count < 1U ||
+                !block_guarantees_return(branch->children[0]))
+                return 0;
+            saw_else = 1;
+        } else {
+            return 0;
+        }
+    }
+
+    return saw_else;
+}
+
 static void analyze_function(SemanticContext *context,
                              const AstNode *function) {
     size_t i;
@@ -746,7 +950,7 @@ static void analyze_function(SemanticContext *context,
         if (parameter == NULL || parameter->kind != AST_PARAMETER) continue;
         parameter_type = lang_type_from_token(parameter->token_type);
         declare_symbol(context, parameter, parameter->lexeme, SYMBOL_PARAMETER,
-                       parameter_type, 0U, NULL, 0U);
+                       parameter_type, 0U, NULL, 0U, NULL);
     }
 
     previous_return_type = context->current_return_type;
@@ -765,11 +969,11 @@ static void analyze_function(SemanticContext *context,
                        context->current_function_name);
 
     if (!context->memory_error && return_type != LANG_TYPE_VAZIO &&
-        !context->saw_return)
-        semantic_error(context, function,
-                       "funcao '%s' com retorno %s nao possui comando respost",
-                       context->current_function_name,
-                       lang_type_name(return_type));
+        !block_guarantees_return(body))
+        semantic_error(
+            context, function,
+            "funcao '%s' com retorno %s nao garante respost em todos os caminhos",
+            context->current_function_name, lang_type_name(return_type));
 
     context->current_return_type = previous_return_type;
     context->current_function_name = previous_function_name;
@@ -780,11 +984,22 @@ static void analyze_function(SemanticContext *context,
 
 static void analyze_program(SemanticContext *context, const AstNode *program) {
     size_t i;
+    size_t principal_count = 0U;
     if (program == NULL || program->kind != AST_PROGRAM) {
         semantic_error(context, program,
                        "raiz da AST deve ser um PROGRAM");
         return;
     }
+
+    for (i = 0U; i < program->child_count; ++i) {
+        const AstNode *node = program->children[i];
+        if (node != NULL && node->kind == AST_PRINCIPAL)
+            ++principal_count;
+    }
+
+    if (principal_count == 0U)
+        semantic_error(context, program,
+                       "programa deve declarar exatamente uma funcao principal");
 
     /*
      * Primeira passagem: registra assinaturas globais de funcoes/principal e
@@ -830,6 +1045,7 @@ SemanticResult semantic_analyze(const AstNode *ast, FILE *error_stream) {
     memset(&context, 0, sizeof(context));
     context.error_stream = error_stream != NULL ? error_stream : stderr;
     context.current_return_type = LANG_TYPE_ERROR;
+    context.program = ast;
 
     if (!symbol_table_init(&context.symbols)) {
         result.status = SEMANTIC_MEMORY_ERROR;

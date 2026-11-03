@@ -1,0 +1,10 @@
+inteira principal() @
+[
+inteira a;
+inteira b;
+inteira soma;
+a receba 7;
+b receba 15;
+soma receba a + b;
+respost soma;
+]

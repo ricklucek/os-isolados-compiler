@@ -1,5 +1,11 @@
 #include "symbol_table.h"
 
+/*
+ * Tabela de simbolos com cadeia de escopos.
+ * Cada escopo aponta para o pai; buscas normais sobem essa cadeia enquanto
+ * declaracoes verificam duplicidade apenas no escopo atual.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,6 +26,7 @@ static void symbol_free(Symbol *symbol) {
     if (symbol == NULL) return;
     free(symbol->name);
     free(symbol->parameter_types);
+    free(symbol->record_type_name);
     memset(symbol, 0, sizeof(*symbol));
 }
 
@@ -66,6 +73,7 @@ const char *lang_type_name(LangType type) {
         case LANG_TYPE_FLUT: return "flut";
         case LANG_TYPE_PALAVRA: return "palavra";
         case LANG_TYPE_DUPLOCARPADO: return "duplocarpado";
+        case LANG_TYPE_RECORD: return "registro";
         case LANG_TYPE_VAZIO: return "vazio";
         case LANG_TYPE_ERROR: return "<erro>";
         default: return "<tipo-desconhecido>";
@@ -204,7 +212,8 @@ static int scope_grow(SymbolScope *scope) {
 SymbolDeclareStatus symbol_table_declare(
     SymbolTable *table, const char *name, SymbolKind kind, LangType type,
     size_t vector_size, const LangType *parameter_types, size_t parameter_count,
-    int line, int column, const Symbol **out_symbol) {
+    const char *record_type_name, int line, int column,
+    const Symbol **out_symbol) {
     SymbolScope *scope;
     Symbol *symbol;
 
@@ -234,6 +243,17 @@ SymbolDeclareStatus symbol_table_declare(
         }
         memcpy(symbol->parameter_types, parameter_types,
                parameter_count * sizeof(*symbol->parameter_types));
+    }
+
+    if (record_type_name != NULL) {
+        symbol->record_type_name = copy_string(record_type_name);
+        if (symbol->record_type_name == NULL) {
+            free(symbol->parameter_types);
+            free(symbol->name);
+            symbol->parameter_types = NULL;
+            symbol->name = NULL;
+            return SYMBOL_DECLARE_MEMORY_ERROR;
+        }
     }
 
     symbol->kind = kind;

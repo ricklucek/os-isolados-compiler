@@ -5,7 +5,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo test test-lexer test-parser test-ast test-semantic test-robustness test-delivery sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir package test test-lexer test-parser test-ast test-semantic test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -21,7 +21,25 @@ run: $(TARGET)
 demo: $(TARGET)
 	./$(TARGET) examples/programa_completo.mac --tokens --ast
 
-test: test-lexer test-parser test-ast test-semantic test-robustness test-delivery
+check: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make check FILE=caminho/programa.mcn"; exit 1; }
+	@./$(TARGET) "$(FILE)"
+
+inspect: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make inspect FILE=caminho/programa.mcn"; exit 1; }
+	@./$(TARGET) "$(FILE)" --tokens --ast
+
+check-dir: $(TARGET)
+	@test -n "$(DIR)" || { echo "Uso: make check-dir DIR=caminho/diretorio"; exit 1; }
+	@test -n "$(strip $(wildcard $(DIR)/*.mcn $(DIR)/*.mac))" || { echo "Nenhum arquivo .mcn/.mac encontrado em $(DIR)."; exit 1; }
+	@set -e; $(foreach file,$(wildcard $(DIR)/*.mcn $(DIR)/*.mac),echo "[VALIDANDO] $(file)"; ./$(TARGET) "$(file)";)
+
+package:
+	@rm -f macaronica-entrega.zip
+	@git archive --format=zip --output=macaronica-entrega.zip HEAD
+	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
+
+test: test-lexer test-parser test-ast test-semantic test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -93,6 +111,10 @@ test-delivery: $(TARGET)
 	@echo "== Casos oficiais de entrega =="
 	@sh tests/entrega/run.sh ./$(TARGET)
 
+test-levels: $(TARGET)
+	@echo "== Programas de nivel fornecidos para validacao =="
+	@sh tests/niveis/run.sh ./$(TARGET)
+
 sanitize:
 	@$(MAKE) clean
 	@$(MAKE) CFLAGS="$(CFLAGS) -g -fsanitize=address,undefined -fno-omit-frame-pointer" \
@@ -121,4 +143,4 @@ docker-sanitize:
 	docker compose run --rm dev sh -lc 'make test-sanitize'
 
 clean:
-	rm -f $(OBJ) $(TARGET) .ast-test.out .robustness-test.out .robustness-test.err
+	rm -f $(OBJ) $(TARGET) .ast-test.out .robustness-test.out .robustness-test.err macaronica-entrega.zip
