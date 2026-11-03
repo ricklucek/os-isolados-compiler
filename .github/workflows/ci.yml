@@ -24,7 +24,5 @@ jobs:
         run: |
           make package
           test -f macaronica-entrega.zip
-          if unzip -Z1 macaronica-entrega.zip | grep -E '(^|/)(macaronica|[^/]+\.o); then
-            echo "Pacote contem artefato de build." >&2
-            exit 1
-          fi
+          test -z "$(unzip -Z1 macaronica-entrega.zip | grep '/macaronica$' || true)"
+          test -z "$(unzip -Z1 macaronica-entrega.zip | grep '[.]o$' || true)"
