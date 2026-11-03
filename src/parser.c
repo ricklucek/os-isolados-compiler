@@ -183,6 +183,32 @@ static void recover_until(Parser *parser, TokenType type) {
         advance_token(parser);
 }
 
+/*
+ * Recupera um comando de controle cujo cabecalho ficou invalido sem deixar
+ * que o bloco interno seja reinterpretado como parte do bloco externo.
+ */
+static void skip_balanced_block(Parser *parser) {
+    size_t depth = 0U;
+
+    if (!check(parser, TOKEN_LEFT_BRACKET)) return;
+
+    do {
+        const Token *token = advance_token(parser);
+        if (token == NULL) return;
+        if (token->type == TOKEN_LEFT_BRACKET)
+            ++depth;
+        else if (token->type == TOKEN_RIGHT_BRACKET && depth > 0U)
+            --depth;
+    } while (!is_at_end(parser) && depth > 0U);
+}
+
+static void recover_control_construct(Parser *parser) {
+    recover_until(parser, TOKEN_RIGHT_PAREN);
+    if (check(parser, TOKEN_RIGHT_PAREN)) advance_token(parser);
+    if (check(parser, TOKEN_EDAI)) advance_token(parser);
+    if (check(parser, TOKEN_LEFT_BRACKET)) skip_balanced_block(parser);
+}
+
 static AstNode *new_node(Parser *parser, AstNodeKind kind,
                          TokenType type, const char *lexeme,
                          int line, int column) {
@@ -983,9 +1009,7 @@ static AstNode *parse_conditional(Parser *parser) {
 
     condition = parse_condition(parser);
     if (condition == NULL) {
-        recover_until(parser, TOKEN_RIGHT_PAREN);
-        consume(parser, TOKEN_RIGHT_PAREN,
-                "cond exige ')' depois da condicao");
+        recover_control_construct(parser);
         ast_free(node);
         return NULL;
     }
@@ -994,6 +1018,8 @@ static AstNode *parse_conditional(Parser *parser) {
                 "cond exige ')' depois da condicao") == NULL ||
         consume(parser, TOKEN_EDAI, "cond exige 'edai'") == NULL) {
         ast_free(condition);
+        if (check(parser, TOKEN_LEFT_BRACKET))
+            skip_balanced_block(parser);
         ast_free(node);
         return NULL;
     }
@@ -1039,9 +1065,7 @@ static AstNode *parse_conditional(Parser *parser) {
 
             else_condition = parse_condition(parser);
             if (else_condition == NULL) {
-                recover_until(parser, TOKEN_RIGHT_PAREN);
-                consume(parser, TOKEN_RIGHT_PAREN,
-                        "casocontrario cond exige ')'");
+                recover_control_construct(parser);
                 ast_free(else_if);
                 ast_free(node);
                 return NULL;
@@ -1140,9 +1164,7 @@ static AstNode *parse_while(Parser *parser) {
 
     condition = parse_condition(parser);
     if (condition == NULL) {
-        recover_until(parser, TOKEN_RIGHT_PAREN);
-        consume(parser, TOKEN_RIGHT_PAREN,
-                "durante exige ')' depois da condicao");
+        recover_control_construct(parser);
         ast_free(node);
         return NULL;
     }
@@ -1151,6 +1173,8 @@ static AstNode *parse_while(Parser *parser) {
                 "durante exige ')' depois da condicao") == NULL ||
         consume(parser, TOKEN_EDAI, "durante exige 'edai'") == NULL) {
         ast_free(condition);
+        if (check(parser, TOKEN_LEFT_BRACKET))
+            skip_balanced_block(parser);
         ast_free(node);
         return NULL;
     }
@@ -1199,9 +1223,7 @@ static AstNode *parse_for(Parser *parser) {
         consume(parser, TOKEN_COMMA,
                 "repete separa inicializacao e condicao com ','") == NULL) {
         ast_free(initialization);
-        recover_until(parser, TOKEN_RIGHT_PAREN);
-        consume(parser, TOKEN_RIGHT_PAREN,
-                "repete exige ')' depois da iteracao");
+        recover_control_construct(parser);
         ast_free(node);
         return NULL;
     }
@@ -1212,9 +1234,7 @@ static AstNode *parse_for(Parser *parser) {
                 "repete separa condicao e iteracao com ','") == NULL) {
         ast_free(initialization);
         ast_free(condition);
-        recover_until(parser, TOKEN_RIGHT_PAREN);
-        consume(parser, TOKEN_RIGHT_PAREN,
-                "repete exige ')' depois da iteracao");
+        recover_control_construct(parser);
         ast_free(node);
         return NULL;
     }
@@ -1227,6 +1247,8 @@ static AstNode *parse_for(Parser *parser) {
         ast_free(initialization);
         ast_free(condition);
         ast_free(iteration);
+        if (check(parser, TOKEN_LEFT_BRACKET))
+            skip_balanced_block(parser);
         ast_free(node);
         return NULL;
     }
