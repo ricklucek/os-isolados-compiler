@@ -3,17 +3,14 @@
 /*
  * Primeiro back-end LLVM da Macaronica.
  *
- * Escopo do Checkpoint 9:
- * - principal inteira sem parametros -> @zl_principal;
- * - variaveis escalares locais e globais;
- * - literais inteira/flut/bool/palavra;
- * - atribuicao a identificador;
- * - expressoes aritmeticas escalares, comparacoes, XOR e unarios;
- * - saida(...) e entrada(...) para os casos suportados pelo runtime POSIX;
- * - respost.
+ * O Checkpoint 10 acrescenta controle de fluxo ao subconjunto escalar:
+ * - cond / casocontrario cond / casocontrario;
+ * - durante;
+ * - repete;
+ * - E e OU com curto-circuito real em blocos basicos.
  *
- * Controle de fluxo, funcoes de usuario, vetores, registros, ^ e raiz()
- * entram nos checkpoints seguintes. Quando um programa valido usa uma
+ * Funcoes de usuario, vetores, registros, ^ e raiz() entram nos checkpoints
+ * seguintes. Quando um programa valido usa uma
  * construcao ainda nao rebaixada, o gerador falha de forma controlada e o
  * arquivo de saida e removido pelo chamador.
  */
@@ -29,6 +26,10 @@ typedef struct {
     const char *name;
     LangType type;
     int global;
+    const AstNode *declaration;
+    char llvm_name[LLVM_OPERAND_CAPACITY];
+    int active;
+    size_t scope_depth;
 } Storage;
 
 typedef struct {
@@ -49,6 +50,9 @@ typedef struct {
     size_t error_count;
     int memory_error;
     size_t next_temp;
+    size_t next_label;
+    size_t scope_depth;
+    char current_block[LLVM_OPERAND_CAPACITY];
 
     Storage *locals;
     size_t local_count;
@@ -120,22 +124,58 @@ static int grow_storage(Storage **items, size_t *capacity, size_t count) {
 }
 
 static int add_storage(CodegenContext *context, int global,
-                       const char *name, LangType type) {
+                       const char *name, LangType type,
+                       const AstNode *declaration) {
     Storage **items = global ? &context->globals : &context->locals;
     size_t *count = global ? &context->global_count : &context->local_count;
     size_t *capacity =
         global ? &context->global_capacity : &context->local_capacity;
+    Storage *storage;
+    size_t same_name_count = 0U;
+    size_t i;
 
     if (!grow_storage(items, capacity, *count)) {
         codegen_memory_error(context);
         return 0;
     }
 
-    (*items)[*count].name = name;
-    (*items)[*count].type = type;
-    (*items)[*count].global = global;
+    if (!global) {
+        for (i = 0U; i < *count; ++i)
+            if (strcmp((*items)[i].name, name) == 0)
+                ++same_name_count;
+    }
+
+    storage = &(*items)[*count];
+    memset(storage, 0, sizeof(*storage));
+    storage->name = name;
+    storage->type = type;
+    storage->global = global;
+    storage->declaration = declaration;
+    storage->active = global;
+
+    if (global)
+        snprintf(storage->llvm_name, sizeof(storage->llvm_name), "%s", name);
+    else if (same_name_count == 0U)
+        snprintf(storage->llvm_name, sizeof(storage->llvm_name),
+                 "%s.addr", name);
+    else
+        snprintf(storage->llvm_name, sizeof(storage->llvm_name),
+                 "%s.%zu.addr", name, same_name_count);
+
     ++(*count);
     return 1;
+}
+
+static Storage *find_storage_by_declaration(CodegenContext *context,
+                                            const AstNode *declaration) {
+    size_t i;
+    if (context == NULL || declaration == NULL) return NULL;
+
+    for (i = 0U; i < context->local_count; ++i)
+        if (context->locals[i].declaration == declaration)
+            return &context->locals[i];
+
+    return NULL;
 }
 
 static const Storage *lookup_storage(const CodegenContext *context,
@@ -145,8 +185,9 @@ static const Storage *lookup_storage(const CodegenContext *context,
     if (context == NULL || name == NULL) return NULL;
 
     for (i = context->local_count; i > 0U; --i) {
-        if (strcmp(context->locals[i - 1U].name, name) == 0)
-            return &context->locals[i - 1U];
+        const Storage *storage = &context->locals[i - 1U];
+        if (storage->active && strcmp(storage->name, name) == 0)
+            return storage;
     }
 
     for (i = 0U; i < context->global_count; ++i) {
@@ -159,10 +200,8 @@ static const Storage *lookup_storage(const CodegenContext *context,
 
 static void storage_pointer(const Storage *storage,
                             char buffer[LLVM_OPERAND_CAPACITY]) {
-    if (storage->global)
-        snprintf(buffer, LLVM_OPERAND_CAPACITY, "@%s", storage->name);
-    else
-        snprintf(buffer, LLVM_OPERAND_CAPACITY, "%%%s.addr", storage->name);
+    snprintf(buffer, LLVM_OPERAND_CAPACITY, "%c%s",
+             storage->global ? '@' : '%', storage->llvm_name);
 }
 
 static int grow_strings(CodegenContext *context) {
@@ -266,6 +305,32 @@ static void new_temp(CodegenContext *context,
     snprintf(buffer, LLVM_OPERAND_CAPACITY, "%%t%zu", context->next_temp++);
 }
 
+static void new_label(CodegenContext *context, const char *prefix,
+                      char buffer[LLVM_OPERAND_CAPACITY]) {
+    snprintf(buffer, LLVM_OPERAND_CAPACITY, "%s.%zu",
+             prefix, context->next_label++);
+}
+
+static void emit_label(CodegenContext *context, const char *label) {
+    fprintf(context->out, "%s:\n", label);
+    snprintf(context->current_block, sizeof(context->current_block),
+             "%s", label);
+    context->block_terminated = 0;
+}
+
+static void emit_branch(CodegenContext *context, const char *label) {
+    fprintf(context->out, "  br label %%%s\n", label);
+    context->block_terminated = 1;
+}
+
+static void emit_cond_branch(CodegenContext *context, const LlvmValue condition,
+                             const char *when_true, const char *when_false) {
+    fprintf(context->out,
+            "  br i1 %s, label %%%s, label %%%s\n",
+            condition.operand, when_true, when_false);
+    context->block_terminated = 1;
+}
+
 static LlvmValue invalid_value(void) {
     LlvmValue value;
     memset(&value, 0, sizeof(value));
@@ -320,6 +385,57 @@ static LlvmValue convert_value(CodegenContext *context, const AstNode *node,
 
 static LlvmValue generate_expression(CodegenContext *context,
                                      const AstNode *node);
+
+static LlvmValue generate_short_circuit(CodegenContext *context,
+                                        const AstNode *node) {
+    LlvmValue left;
+    LlvmValue right;
+    char rhs_label[LLVM_OPERAND_CAPACITY];
+    char end_label[LLVM_OPERAND_CAPACITY];
+    char left_predecessor[LLVM_OPERAND_CAPACITY];
+    char right_predecessor[LLVM_OPERAND_CAPACITY];
+    char result[LLVM_OPERAND_CAPACITY];
+    const int is_and = node->token_type == TOKEN_E;
+
+    left = generate_expression(context, node->children[0]);
+    if (!left.valid || left.type != LANG_TYPE_BOOL) {
+        codegen_error(context, node,
+                      "curto-circuito exige operando esquerdo bool");
+        return invalid_value();
+    }
+
+    snprintf(left_predecessor, sizeof(left_predecessor), "%s",
+             context->current_block);
+    new_label(context, is_and ? "and.rhs" : "or.rhs", rhs_label);
+    new_label(context, is_and ? "and.end" : "or.end", end_label);
+
+    if (is_and)
+        emit_cond_branch(context, left, rhs_label, end_label);
+    else
+        emit_cond_branch(context, left, end_label, rhs_label);
+
+    emit_label(context, rhs_label);
+    right = generate_expression(context, node->children[1]);
+    if (!right.valid || right.type != LANG_TYPE_BOOL) {
+        codegen_error(context, node,
+                      "curto-circuito exige operando direito bool");
+        return invalid_value();
+    }
+
+    snprintf(right_predecessor, sizeof(right_predecessor), "%s",
+             context->current_block);
+    emit_branch(context, end_label);
+
+    emit_label(context, end_label);
+    new_temp(context, result);
+    fprintf(context->out,
+            "  %s = phi i1 [ %s, %%%s ], [ %s, %%%s ]\n",
+            result,
+            is_and ? "false" : "true", left_predecessor,
+            right.operand, right_predecessor);
+
+    return make_value(LANG_TYPE_BOOL, result);
+}
 
 static LlvmValue generate_identifier(CodegenContext *context,
                                      const AstNode *node) {
@@ -410,12 +526,8 @@ static LlvmValue generate_binary(CodegenContext *context,
 
     if (node->child_count < 2U) return invalid_value();
 
-    if (node->token_type == TOKEN_E || node->token_type == TOKEN_OU) {
-        codegen_error(
-            context, node,
-            "E/OU exigem curto-circuito e serao rebaixados com controle de fluxo no proximo checkpoint");
-        return invalid_value();
-    }
+    if (node->token_type == TOKEN_E || node->token_type == TOKEN_OU)
+        return generate_short_circuit(context, node);
 
     if (node->token_type == TOKEN_CARET) {
         codegen_error(context, node,
@@ -634,7 +746,8 @@ static int declare_global(CodegenContext *context, const AstNode *node) {
         if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
             continue;
 
-        if (!add_storage(context, 1, identifier->lexeme, type)) return 0;
+        if (!add_storage(context, 1, identifier->lexeme, type, identifier))
+            return 0;
         fprintf(context->out, "@%s = global %s zeroinitializer\n",
                 identifier->lexeme, type_name);
     }
@@ -642,47 +755,98 @@ static int declare_global(CodegenContext *context, const AstNode *node) {
     return 1;
 }
 
-static int predeclare_locals(CodegenContext *context, const AstNode *body) {
+static int predeclare_locals(CodegenContext *context,
+                             const AstNode *node) {
     size_t i;
-    size_t j;
+    size_t first_child = 0U;
 
-    for (i = 0U; i < body->child_count; ++i) {
-        const AstNode *statement = body->children[i];
+    if (node == NULL || context->memory_error) return !context->memory_error;
+
+    if (node->kind == AST_VECTOR_DECL) {
+        codegen_error(context, node,
+                      "vetores entram no checkpoint de vetores/registros");
+        return 0;
+    }
+
+    if (node->kind == AST_VAR_DECL) {
         LangType type;
         const char *type_name;
 
-        if (statement == NULL || statement->kind != AST_VAR_DECL)
-            continue;
-
-        if (statement->token_type == TOKEN_IDENTIFIER) {
-            codegen_error(context, statement,
-                          "variavel local de registro entra no checkpoint de registros");
+        if (node->token_type == TOKEN_IDENTIFIER) {
+            codegen_error(context, node,
+                          "variavel local de registro entra no checkpoint de vetores/registros");
             return 0;
         }
 
-        type = lang_type_from_token(statement->token_type);
+        type = lang_type_from_token(node->token_type);
         type_name = llvm_type(type);
         if (type_name == NULL || type == LANG_TYPE_VAZIO) {
-            codegen_error(context, statement,
+            codegen_error(context, node,
                           "tipo local %s ainda nao suportado",
                           lang_type_name(type));
             return 0;
         }
 
-        for (j = 0U; j < statement->child_count; ++j) {
-            const AstNode *identifier = statement->children[j];
+        for (i = first_child; i < node->child_count; ++i) {
+            const AstNode *identifier = node->children[i];
+            Storage *storage;
+
             if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
                 continue;
 
-            if (!add_storage(context, 0, identifier->lexeme, type))
+            if (!add_storage(context, 0, identifier->lexeme, type, identifier))
                 return 0;
 
-            fprintf(context->out, "  %%%s.addr = alloca %s ; linha %d\n",
-                    identifier->lexeme, type_name, identifier->line);
+            storage = &context->locals[context->local_count - 1U];
+            fprintf(context->out,
+                    "  %%%s = alloca %s ; linha %d\n",
+                    storage->llvm_name, type_name, identifier->line);
         }
+        return 1;
+    }
+
+    for (i = 0U; i < node->child_count; ++i)
+        if (!predeclare_locals(context, node->children[i]))
+            return 0;
+
+    return 1;
+}
+
+static int activate_declaration(CodegenContext *context,
+                                const AstNode *node) {
+    size_t i;
+
+    if (node == NULL || node->kind != AST_VAR_DECL) return 1;
+
+    for (i = 0U; i < node->child_count; ++i) {
+        const AstNode *identifier = node->children[i];
+        Storage *storage;
+
+        if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
+            continue;
+
+        storage = find_storage_by_declaration(context, identifier);
+        if (storage == NULL) {
+            codegen_error(context, identifier,
+                          "armazenamento prealocado de '%s' nao encontrado",
+                          identifier->lexeme);
+            return 0;
+        }
+
+        storage->active = 1;
+        storage->scope_depth = context->scope_depth;
     }
 
     return 1;
+}
+
+static void deactivate_scope(CodegenContext *context, size_t scope_depth) {
+    size_t i;
+
+    for (i = 0U; i < context->local_count; ++i)
+        if (context->locals[i].active &&
+            context->locals[i].scope_depth == scope_depth)
+            context->locals[i].active = 0;
 }
 
 static int generate_assignment(CodegenContext *context,
@@ -840,18 +1004,243 @@ static int generate_return(CodegenContext *context, const AstNode *node) {
 }
 
 static int generate_statement(CodegenContext *context,
+                              const AstNode *node);
+
+static int generate_block(CodegenContext *context, const AstNode *block,
+                          int create_scope) {
+    size_t i;
+    size_t this_scope = context->scope_depth;
+
+    if (block == NULL || block->kind != AST_BLOCK) {
+        codegen_error(context, block, "bloco LLVM invalido");
+        return 0;
+    }
+
+    if (create_scope) {
+        ++context->scope_depth;
+        this_scope = context->scope_depth;
+    }
+
+    for (i = 0U; i < block->child_count && !context->memory_error; ++i) {
+        if (context->block_terminated) break;
+        if (!generate_statement(context, block->children[i])) {
+            if (create_scope) {
+                deactivate_scope(context, this_scope);
+                --context->scope_depth;
+            }
+            return 0;
+        }
+    }
+
+    if (create_scope) {
+        deactivate_scope(context, this_scope);
+        --context->scope_depth;
+    }
+
+    return 1;
+}
+
+static int generate_if(CodegenContext *context, const AstNode *node) {
+    const AstNode *condition;
+    const AstNode *body;
+    size_t next_branch = 2U;
+    char end_label[LLVM_OPERAND_CAPACITY];
+    int reaches_end = 0;
+
+    if (node->child_count < 2U) {
+        codegen_error(context, node, "condicional incompleto na AST");
+        return 0;
+    }
+
+    condition = node->children[0];
+    body = node->children[1];
+    new_label(context, "if.end", end_label);
+
+    for (;;) {
+        LlvmValue value;
+        char then_label[LLVM_OPERAND_CAPACITY];
+        char false_label[LLVM_OPERAND_CAPACITY];
+        const AstNode *next = next_branch < node->child_count
+                                  ? node->children[next_branch]
+                                  : NULL;
+
+        new_label(context, "if.then", then_label);
+        if (next == NULL)
+            snprintf(false_label, sizeof(false_label), "%s", end_label);
+        else if (next->kind == AST_ELSE)
+            new_label(context, "if.else", false_label);
+        else
+            new_label(context, "if.next", false_label);
+
+        value = generate_expression(context, condition);
+        if (!value.valid || value.type != LANG_TYPE_BOOL) {
+            codegen_error(context, condition,
+                          "condicao LLVM deve produzir i1");
+            return 0;
+        }
+
+        emit_cond_branch(context, value, then_label, false_label);
+
+        emit_label(context, then_label);
+        if (!generate_block(context, body, 1)) return 0;
+        if (!context->block_terminated) {
+            emit_branch(context, end_label);
+            reaches_end = 1;
+        }
+
+        if (next == NULL) {
+            reaches_end = 1; /* ramo falso cai diretamente no fim */
+            break;
+        }
+
+        emit_label(context, false_label);
+
+        if (next->kind == AST_ELSE_IF) {
+            if (next->child_count < 2U) {
+                codegen_error(context, next,
+                              "casocontrario cond incompleto na AST");
+                return 0;
+            }
+            condition = next->children[0];
+            body = next->children[1];
+            ++next_branch;
+            continue;
+        }
+
+        if (next->kind == AST_ELSE) {
+            if (next->child_count < 1U) {
+                codegen_error(context, next,
+                              "casocontrario incompleto na AST");
+                return 0;
+            }
+            if (!generate_block(context, next->children[0], 1)) return 0;
+            if (!context->block_terminated) {
+                emit_branch(context, end_label);
+                reaches_end = 1;
+            }
+            ++next_branch;
+            break;
+        }
+
+        codegen_error(context, next,
+                      "ramo inesperado %s no condicional",
+                      ast_node_kind_name(next->kind));
+        return 0;
+    }
+
+    if (reaches_end) {
+        emit_label(context, end_label);
+        context->block_terminated = 0;
+    } else {
+        context->block_terminated = 1;
+    }
+
+    return 1;
+}
+
+static int generate_while(CodegenContext *context, const AstNode *node) {
+    LlvmValue condition;
+    char cond_label[LLVM_OPERAND_CAPACITY];
+    char body_label[LLVM_OPERAND_CAPACITY];
+    char end_label[LLVM_OPERAND_CAPACITY];
+
+    if (node->child_count < 2U) {
+        codegen_error(context, node, "durante incompleto na AST");
+        return 0;
+    }
+
+    new_label(context, "while.cond", cond_label);
+    new_label(context, "while.body", body_label);
+    new_label(context, "while.end", end_label);
+
+    emit_branch(context, cond_label);
+
+    emit_label(context, cond_label);
+    condition = generate_expression(context, node->children[0]);
+    if (!condition.valid || condition.type != LANG_TYPE_BOOL) {
+        codegen_error(context, node->children[0],
+                      "condicao de durante deve produzir i1");
+        return 0;
+    }
+    emit_cond_branch(context, condition, body_label, end_label);
+
+    emit_label(context, body_label);
+    if (!generate_block(context, node->children[1], 1)) return 0;
+    if (!context->block_terminated)
+        emit_branch(context, cond_label);
+
+    emit_label(context, end_label);
+    return 1;
+}
+
+static int generate_for(CodegenContext *context, const AstNode *node) {
+    LlvmValue condition;
+    char cond_label[LLVM_OPERAND_CAPACITY];
+    char body_label[LLVM_OPERAND_CAPACITY];
+    char step_label[LLVM_OPERAND_CAPACITY];
+    char end_label[LLVM_OPERAND_CAPACITY];
+
+    if (node->child_count < 4U) {
+        codegen_error(context, node, "repete incompleto na AST");
+        return 0;
+    }
+
+    if (!generate_assignment(context, node->children[0])) return 0;
+
+    new_label(context, "for.cond", cond_label);
+    new_label(context, "for.body", body_label);
+    new_label(context, "for.step", step_label);
+    new_label(context, "for.end", end_label);
+
+    emit_branch(context, cond_label);
+
+    emit_label(context, cond_label);
+    condition = generate_expression(context, node->children[1]);
+    if (!condition.valid || condition.type != LANG_TYPE_BOOL) {
+        codegen_error(context, node->children[1],
+                      "condicao de repete deve produzir i1");
+        return 0;
+    }
+    emit_cond_branch(context, condition, body_label, end_label);
+
+    emit_label(context, body_label);
+    if (!generate_block(context, node->children[3], 1)) return 0;
+    if (!context->block_terminated)
+        emit_branch(context, step_label);
+
+    emit_label(context, step_label);
+    if (!generate_assignment(context, node->children[2])) return 0;
+    emit_branch(context, cond_label);
+
+    emit_label(context, end_label);
+    return 1;
+}
+
+static int generate_statement(CodegenContext *context,
                               const AstNode *node) {
     if (context->block_terminated || node == NULL) return 1;
 
     switch (node->kind) {
         case AST_VAR_DECL:
-            return 1;
+            return activate_declaration(context, node);
         case AST_ASSIGNMENT:
             return generate_assignment(context, node);
         case AST_CALL:
             return generate_builtin_call(context, node);
         case AST_RETURN:
             return generate_return(context, node);
+        case AST_IF:
+            return generate_if(context, node);
+        case AST_WHILE:
+            return generate_while(context, node);
+        case AST_FOR:
+            return generate_for(context, node);
+        case AST_BLOCK:
+            return generate_block(context, node, 1);
+        case AST_VECTOR_DECL:
+            codegen_error(context, node,
+                          "vetor sera rebaixado no checkpoint de vetores/registros");
+            return 0;
         default:
             codegen_error(context, node,
                           "comando %s sera rebaixado em checkpoint posterior",
@@ -887,7 +1276,6 @@ static size_t parameter_count(const AstNode *function) {
 static int generate_principal(CodegenContext *context,
                               const AstNode *function) {
     const AstNode *body;
-    size_t i;
 
     if (function->token_type != TOKEN_INTEIRA) {
         codegen_error(context, function,
@@ -912,15 +1300,16 @@ static int generate_principal(CodegenContext *context,
     context->current_return_type = LANG_TYPE_INTEIRA;
     context->block_terminated = 0;
     context->next_temp = 0U;
+    context->next_label = 0U;
+    context->scope_depth = 0U;
+    snprintf(context->current_block, sizeof(context->current_block), "entry");
 
     fprintf(context->out,
             "define i32 @zl_principal() nounwind {\n"
             "entry:\n");
 
     if (!predeclare_locals(context, body)) return 0;
-
-    for (i = 0U; i < body->child_count && !context->memory_error; ++i)
-        if (!generate_statement(context, body->children[i])) return 0;
+    if (!generate_block(context, body, 0)) return 0;
 
     if (!context->block_terminated) {
         codegen_error(context, function,
