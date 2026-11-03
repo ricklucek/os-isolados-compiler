@@ -1,0 +1,189 @@
+registro Cuidador @
+[
+palavra nome;
+inteira documento;
+inteira idade;
+]
+
+outrafuncao inteira resto(inteira a, inteira b) @
+[
+inteira quociente;
+inteira r;
+quociente receba a // b;
+r receba quociente * b;
+r receba a - r;
+respost r;
+]
+
+outrafuncao bool validarCpf(inteira doc) @
+[
+inteira restoOnze;
+bool valido;
+restoOnze receba resto(doc, 11);
+valido receba restoOnze ! 0;
+respost valido;
+]
+
+inteira principal() @
+[
+inteira i;
+inteira j;
+inteira tamanho;
+inteira limiteSort;
+inteira tempPeso;
+palavra tempNome;
+inteira tempIdade;
+palavra tempEspecie;
+inteira pesoAtual;
+inteira pesoProximo;
+palavra nomeAtual;
+palavra alvo;
+inteira indiceEncontrado;
+bool cpfOk;
+inteira somaPesos;
+inteira mediaPesos;
+
+palavra vet{6} nomes;
+inteira vet{6} pesos;
+inteira vet{6} idades;
+palavra vet{6} especies;
+
+Cuidador responsavel;
+
+tamanho receba 6;
+limiteSort receba tamanho - 1;
+
+nomes{0} receba "Simba";
+especies{0} receba "leao";
+pesos{0} receba 190;
+idades{0} receba 5;
+
+nomes{1} receba "Baloo";
+especies{1} receba "urso";
+pesos{1} receba 260;
+idades{1} receba 8;
+
+nomes{2} receba "Zazu";
+especies{2} receba "tucano";
+pesos{2} receba 2;
+idades{2} receba 3;
+
+nomes{3} receba "Rajah";
+especies{3} receba "tigre";
+pesos{3} receba 210;
+idades{3} receba 4;
+
+nomes{4} receba "Dumbo";
+especies{4} receba "elefante";
+pesos{4} receba 540;
+idades{4} receba 2;
+
+nomes{5} receba "Marlin";
+especies{5} receba "peixe";
+pesos{5} receba 1;
+idades{5} receba 6;
+
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+repete ( j receba 0 , j < limiteSort , j receba j + 1 ) edai
+[
+pesoAtual receba pesos{j};
+pesoProximo receba pesos{j + 1};
+cond ( pesoAtual > pesoProximo ) edai
+[
+tempPeso receba pesos{j};
+pesos{j} receba pesos{j + 1};
+pesos{j + 1} receba tempPeso;
+
+tempNome receba nomes{j};
+nomes{j} receba nomes{j + 1};
+nomes{j + 1} receba tempNome;
+
+tempIdade receba idades{j};
+idades{j} receba idades{j + 1};
+idades{j + 1} receba tempIdade;
+
+tempEspecie receba especies{j};
+especies{j} receba especies{j + 1};
+especies{j + 1} receba tempEspecie;
+]
+]
+]
+
+responsavel.nome receba "Ana Paula";
+responsavel.documento receba 12345678901;
+responsavel.idade receba 34;
+
+cpfOk receba validarCpf(responsavel.documento);
+
+alvo receba "Rajah";
+indiceEncontrado receba 0 - 1;
+i receba 0;
+durante ( i < tamanho ) edai
+[
+nomeAtual receba nomes{i};
+cond ( nomeAtual == alvo ) edai
+[
+indiceEncontrado receba i;
+i receba tamanho;
+]
+casocontrario edai
+[
+i receba i + 1;
+]
+]
+
+somaPesos receba 0;
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+somaPesos receba somaPesos + pesos{i};
+]
+mediaPesos receba somaPesos // tamanho;
+
+inteira vet{3} documentosCuidadores;
+inteira qtdCuidadores;
+inteira qtdCpfValidos;
+inteira docAtual;
+bool cpfAtualValido;
+
+qtdCuidadores receba 3;
+documentosCuidadores{0} receba 12345678901;
+documentosCuidadores{1} receba 98765432100;
+documentosCuidadores{2} receba 11122233344;
+
+qtdCpfValidos receba 0;
+i receba 0;
+repete ( i receba 0 , i < qtdCuidadores , i receba i + 1 ) edai
+[
+docAtual receba documentosCuidadores{i};
+cpfAtualValido receba validarCpf(docAtual);
+cond ( cpfAtualValido == VER ) edai
+[
+qtdCpfValidos receba qtdCpfValidos + 1;
+]
+]
+
+inteira qtdAcimaDaMedia;
+qtdAcimaDaMedia receba 0;
+i receba 0;
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+pesoAtual receba pesos{i};
+cond ( pesoAtual > mediaPesos ) edai
+[
+qtdAcimaDaMedia receba qtdAcimaDaMedia + 1;
+]
+]
+
+inteira totalDeIdades;
+inteira idadeAtual;
+totalDeIdades receba 0;
+i receba 0;
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+idadeAtual receba idades{i};
+totalDeIdades receba totalDeIdades + idadeAtual;
+]
+
+respost mediaPesos;
+]

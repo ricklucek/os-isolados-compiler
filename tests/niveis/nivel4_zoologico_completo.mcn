@@ -1,0 +1,478 @@
+registro Cuidador @
+[
+palavra nome;
+inteira documento;
+inteira idade;
+]
+
+registro Recinto @
+[
+palavra nome;
+inteira capacidade;
+inteira ocupacaoAtual;
+]
+
+outrafuncao inteira resto(inteira a, inteira b) @
+[
+inteira quociente;
+inteira r;
+quociente receba a // b;
+r receba quociente * b;
+r receba a - r;
+respost r;
+]
+
+outrafuncao bool validarCpf(inteira doc) @
+[
+inteira restoOnze;
+bool valido;
+restoOnze receba resto(doc, 11);
+valido receba restoOnze ! 0;
+respost valido;
+]
+
+outrafuncao bool ehPrimo(inteira n) @
+[
+bool primo;
+inteira divisor;
+inteira quociente;
+inteira restoDivisao;
+primo receba VER;
+cond ( n < 2 ) edai
+[
+primo receba FAL;
+]
+divisor receba 2;
+durante ( divisor < n ) edai
+[
+quociente receba n // divisor;
+restoDivisao receba quociente * divisor;
+restoDivisao receba n - restoDivisao;
+cond ( restoDivisao == 0 ) edai
+[
+primo receba FAL;
+]
+divisor receba divisor + 1;
+]
+respost primo;
+]
+
+outrafuncao inteira fibonacci(inteira n) @
+[
+inteira resultado;
+inteira parteUm;
+inteira parteDois;
+cond ( n < 2 ) edai
+[
+resultado receba n;
+]
+casocontrario edai
+[
+parteUm receba fibonacci(n - 1);
+parteDois receba fibonacci(n - 2);
+resultado receba parteUm + parteDois;
+]
+respost resultado;
+]
+
+outrafuncao bool verificarFaixaEtaria(inteira idade, inteira minimo, inteira maximo) @
+[
+bool acimaDoMinimo;
+bool abaixoDoMaximo;
+bool dentroDaFaixa;
+bool foraDaFaixa;
+acimaDoMinimo receba idade > minimo;
+abaixoDoMaximo receba idade < maximo;
+dentroDaFaixa receba acimaDoMinimo E abaixoDoMaximo;
+foraDaFaixa receba NÃO dentroDaFaixa;
+respost foraDaFaixa;
+]
+
+inteira principal() @
+[
+inteira i;
+inteira j;
+inteira k;
+inteira tamanho;
+inteira limiteSort;
+inteira qtdCuidadores;
+inteira tempPeso;
+palavra tempNome;
+inteira tempIdade;
+palavra tempEspecie;
+inteira pesoAtual;
+inteira pesoProximo;
+palavra nomeAtual;
+palavra alvo;
+inteira indiceEncontrado;
+inteira inicio;
+inteira fim;
+inteira meio;
+inteira pesoNoMeio;
+inteira pesoBuscado;
+bool cpfOk;
+bool combinacaoLogica;
+inteira somaPesos;
+inteira mediaPesos;
+inteira candidato;
+inteira qtdPrimos;
+bool candidatoPrimo;
+inteira maiorDistancia;
+inteira distanciaAtual;
+inteira linhaMax;
+inteira colunaMax;
+inteira fibResultado;
+inteira potResultado;
+inteira qtdVizinhoMaisPesado;
+inteira docAtual;
+bool cpfAtualValido;
+inteira qtdCpfValidos;
+duplocarpado somaComoDuplo;
+duplocarpado raizDaSoma;
+
+palavra vet{12} nomes;
+inteira vet{12} pesos;
+inteira vet{12} idades;
+palavra vet{12} especies;
+
+palavra vet{6} nomesCuidadores;
+inteira vet{6} documentos;
+inteira vet{6} idadesCuidadores;
+
+inteira vet{12} primosEncontrados;
+
+inteira vet{6} distanciasLinha0;
+inteira vet{6} distanciasLinha1;
+inteira vet{6} distanciasLinha2;
+inteira vet{6} distanciasLinha3;
+inteira vet{6} distanciasLinha4;
+inteira vet{6} distanciasLinha5;
+
+tamanho receba 12;
+limiteSort receba tamanho - 1;
+qtdCuidadores receba 6;
+
+nomes{0} receba "Simba0";
+especies{0} receba "leao";
+pesos{0} receba 190;
+idades{0} receba 1;
+
+nomes{1} receba "Baloo1";
+especies{1} receba "urso";
+pesos{1} receba 260;
+idades{1} receba 2;
+
+nomes{2} receba "Zazu2";
+especies{2} receba "tucano";
+pesos{2} receba 2;
+idades{2} receba 3;
+
+nomes{3} receba "Rajah3";
+especies{3} receba "tigre";
+pesos{3} receba 210;
+idades{3} receba 4;
+
+nomes{4} receba "Dumbo4";
+especies{4} receba "elefante";
+pesos{4} receba 540;
+idades{4} receba 5;
+
+nomes{5} receba "Marlin5";
+especies{5} receba "peixe";
+pesos{5} receba 4;
+idades{5} receba 6;
+
+nomes{6} receba "Melman6";
+especies{6} receba "girafa";
+pesos{6} receba 600;
+idades{6} receba 7;
+
+nomes{7} receba "Skipper7";
+especies{7} receba "pinguim";
+pesos{7} receba 6;
+idades{7} receba 8;
+
+nomes{8} receba "Akela8";
+especies{8} receba "lobo";
+pesos{8} receba 60;
+idades{8} receba 9;
+
+nomes{9} receba "Rex9";
+especies{9} receba "macaco";
+pesos{9} receba 40;
+idades{9} receba 10;
+
+nomes{10} receba "Stripes10";
+especies{10} receba "zebra";
+pesos{10} receba 320;
+idades{10} receba 11;
+
+nomes{11} receba "Bubbles11";
+especies{11} receba "hipopotamo";
+pesos{11} receba 1400;
+idades{11} receba 12;
+
+nomesCuidadores{0} receba "Ana Paula";
+documentos{0} receba 12345678901;
+idadesCuidadores{0} receba 25;
+
+nomesCuidadores{1} receba "Bruno Alves";
+documentos{1} receba 98765432100;
+idadesCuidadores{1} receba 26;
+
+nomesCuidadores{2} receba "Carla Dias";
+documentos{2} receba 11122233344;
+idadesCuidadores{2} receba 27;
+
+nomesCuidadores{3} receba "Diego Souza";
+documentos{3} receba 55566677788;
+idadesCuidadores{3} receba 28;
+
+nomesCuidadores{4} receba "Elisa Nunes";
+documentos{4} receba 22233344455;
+idadesCuidadores{4} receba 29;
+
+nomesCuidadores{5} receba "Fabio Lima";
+documentos{5} receba 33344455566;
+idadesCuidadores{5} receba 30;
+
+distanciasLinha0{0} receba 1;
+distanciasLinha0{1} receba 4;
+distanciasLinha0{2} receba 7;
+distanciasLinha0{3} receba 10;
+distanciasLinha0{4} receba 13;
+distanciasLinha0{5} receba 16;
+
+distanciasLinha1{0} receba 4;
+distanciasLinha1{1} receba 1;
+distanciasLinha1{2} receba 4;
+distanciasLinha1{3} receba 7;
+distanciasLinha1{4} receba 10;
+distanciasLinha1{5} receba 13;
+
+distanciasLinha2{0} receba 7;
+distanciasLinha2{1} receba 4;
+distanciasLinha2{2} receba 1;
+distanciasLinha2{3} receba 4;
+distanciasLinha2{4} receba 7;
+distanciasLinha2{5} receba 10;
+
+distanciasLinha3{0} receba 10;
+distanciasLinha3{1} receba 7;
+distanciasLinha3{2} receba 4;
+distanciasLinha3{3} receba 1;
+distanciasLinha3{4} receba 4;
+distanciasLinha3{5} receba 7;
+
+distanciasLinha4{0} receba 13;
+distanciasLinha4{1} receba 10;
+distanciasLinha4{2} receba 7;
+distanciasLinha4{3} receba 4;
+distanciasLinha4{4} receba 1;
+distanciasLinha4{5} receba 4;
+
+distanciasLinha5{0} receba 16;
+distanciasLinha5{1} receba 13;
+distanciasLinha5{2} receba 10;
+distanciasLinha5{3} receba 7;
+distanciasLinha5{4} receba 4;
+distanciasLinha5{5} receba 1;
+
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+repete ( j receba 0 , j < limiteSort , j receba j + 1 ) edai
+[
+pesoAtual receba pesos{j};
+pesoProximo receba pesos{j + 1};
+cond ( pesoAtual > pesoProximo ) edai
+[
+tempPeso receba pesos{j};
+pesos{j} receba pesos{j + 1};
+pesos{j + 1} receba tempPeso;
+
+tempNome receba nomes{j};
+nomes{j} receba nomes{j + 1};
+nomes{j + 1} receba tempNome;
+
+tempIdade receba idades{j};
+idades{j} receba idades{j + 1};
+idades{j + 1} receba tempIdade;
+
+tempEspecie receba especies{j};
+especies{j} receba especies{j + 1};
+especies{j + 1} receba tempEspecie;
+]
+]
+]
+
+pesoBuscado receba pesos{0};
+inicio receba 0;
+fim receba limiteSort;
+indiceEncontrado receba 0 - 1;
+durante ( fim > inicio ) edai
+[
+meio receba inicio + fim;
+meio receba meio // 2;
+pesoNoMeio receba pesos{meio};
+cond ( pesoNoMeio == pesoBuscado ) edai
+[
+indiceEncontrado receba meio;
+inicio receba fim + 1;
+]
+casocontrario edai
+[
+cond ( pesoNoMeio < pesoBuscado ) edai
+[
+inicio receba meio + 1;
+]
+casocontrario edai
+[
+fim receba meio - 1;
+]
+]
+]
+pesoNoMeio receba pesos{inicio};
+cond ( pesoNoMeio == pesoBuscado ) edai
+[
+indiceEncontrado receba inicio;
+]
+
+qtdPrimos receba 0;
+repete ( candidato receba 2 , candidato < 50 , candidato receba candidato + 1 ) edai
+[
+candidatoPrimo receba ehPrimo(candidato);
+cond ( candidatoPrimo == VER ) edai
+[
+cond ( qtdPrimos < tamanho ) edai
+[
+primosEncontrados{qtdPrimos} receba candidato;
+qtdPrimos receba qtdPrimos + 1;
+]
+]
+]
+
+qtdCpfValidos receba 0;
+repete ( i receba 0 , i < qtdCuidadores , i receba i + 1 ) edai
+[
+docAtual receba documentos{i};
+cpfAtualValido receba validarCpf(docAtual);
+cond ( cpfAtualValido == VER ) edai
+[
+qtdCpfValidos receba qtdCpfValidos + 1;
+]
+]
+
+combinacaoLogica receba verificarFaixaEtaria(idadesCuidadores{0}, 18, 60);
+
+maiorDistancia receba 0;
+linhaMax receba 0;
+colunaMax receba 0;
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha0{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 0;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha1{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 1;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha2{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 2;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha3{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 3;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha4{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 4;
+colunaMax receba j;
+]
+]
+j receba 0;
+repete ( j receba 0 , j < 6 , j receba j + 1 ) edai
+[
+distanciaAtual receba distanciasLinha5{j};
+cond ( distanciaAtual > maiorDistancia ) edai
+[
+maiorDistancia receba distanciaAtual;
+linhaMax receba 5;
+colunaMax receba j;
+]
+]
+
+somaPesos receba 0;
+repete ( i receba 0 , i < tamanho , i receba i + 1 ) edai
+[
+somaPesos receba somaPesos + pesos{i};
+]
+mediaPesos receba somaPesos // tamanho;
+somaComoDuplo receba somaPesos;
+raizDaSoma receba raiz(somaComoDuplo);
+
+qtdVizinhoMaisPesado receba 0;
+repete ( i receba 0 , i < limiteSort , i receba i + 1 ) edai
+[
+pesoAtual receba pesos{i};
+pesoProximo receba pesos{i + 1};
+cond ( pesoProximo > pesoAtual ) edai
+[
+qtdVizinhoMaisPesado receba qtdVizinhoMaisPesado + 1;
+]
+]
+
+fibResultado receba fibonacci(10);
+potResultado receba 2 ^ 8;
+
+alvo receba "Rajah3";
+indiceEncontrado receba 0 - 1;
+i receba 0;
+durante ( i < tamanho ) edai
+[
+nomeAtual receba nomes{i};
+cond ( nomeAtual == alvo ) edai
+[
+indiceEncontrado receba i;
+i receba tamanho;
+]
+casocontrario edai
+[
+i receba i + 1;
+]
+]
+
+respost mediaPesos;
+]
