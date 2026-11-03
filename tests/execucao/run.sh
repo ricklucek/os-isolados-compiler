@@ -12,9 +12,10 @@ BC=.llvm-test.bc
 PROG=.llvm-test-prog
 OUT=.llvm-test.out
 INVALID=.llvm-invalid.ll
+UNSUPPORTED=.llvm-unsupported.ll
 
 cleanup() {
-    rm -f "$IR" "$BC" "$PROG" "$OUT" "$INVALID"
+    rm -f "$IR" "$BC" "$PROG" "$OUT" "$INVALID" "$UNSUPPORTED"
 }
 trap cleanup EXIT INT TERM
 cleanup
@@ -78,5 +79,12 @@ if "$BIN" tests/invalidos/semantic_01_nao_declarada.mac     -o "$INVALID" >/dev/
 fi
 [ ! -e "$INVALID" ] ||
     fail "fonte invalido deixou arquivo LLVM"
+
+status=0
+"$BIN" tests/validos/semantic_08_tipos_backend.mac     -o "$UNSUPPORTED" >/dev/null 2>&1 || status=$?
+[ "$status" -eq 8 ] ||
+    fail "construcao ainda nao rebaixada deveria retornar exit 8, recebeu $status"
+[ ! -e "$UNSUPPORTED" ] ||
+    fail "falha controlada de codegen deixou LLVM parcial"
 
 echo "LLVM IR valida, executavel e portavel nos casos do checkpoint."
