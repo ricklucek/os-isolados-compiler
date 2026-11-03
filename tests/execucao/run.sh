@@ -49,7 +49,7 @@ status=0
     fail "clang nao ligou IR + runtime POSIX"
 
 status=0
-"$PROG" >/dev/null || status=$?
+"./$PROG" >/dev/null || status=$?
 [ "$status" -eq 42 ] ||
     fail "executavel POSIX esperava codigo 42 e recebeu $status"
 
@@ -69,7 +69,7 @@ status=0
     fail "verify rejeitou programa de saida"
 "$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
     fail "clang nao ligou programa de saida"
-"$PROG" > "$OUT" || fail "programa de saida retornou erro"
+"./$PROG" > "$OUT" || fail "programa de saida retornou erro"
 cmp -s "$OUT" tests/execucao/03_saida_tipos.esperado ||
     fail "saida do runtime POSIX divergiu do esperado"
 

@@ -27,6 +27,6 @@ cleanup
 "$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" || exit $?
 
 status=0
-"$PROG" || status=$?
+"./$PROG" || status=$?
 echo "codigo de saida: $status"
 exit 0
