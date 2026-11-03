@@ -3,7 +3,6 @@ name: C99 validation
 on:
   pull_request:
   push:
-    branches: [main, develop]
 
 jobs:
   build-and-test:
