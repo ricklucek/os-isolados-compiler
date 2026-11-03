@@ -13,5 +13,18 @@ jobs:
         run: make clean && make
       - name: Full test suite
         run: make test
+      - name: Helper commands
+        run: |
+          make check FILE=tests/niveis/nivel1_soma.mcn
+          make inspect FILE=tests/niveis/nivel1_soma.mcn >/dev/null
+          make check-dir DIR=tests/niveis
       - name: Sanitizers
         run: make test-sanitize
+      - name: Delivery package
+        run: |
+          make package
+          test -f macaronica-entrega.zip
+          if unzip -Z1 macaronica-entrega.zip | grep -E '(^|/)(macaronica|[^/]+\.o); then
+            echo "Pacote contem artefato de build." >&2
+            exit 1
+          fi
