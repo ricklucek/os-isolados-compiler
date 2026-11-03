@@ -1,0 +1,17 @@
+inteira principal() @
+[
+    bool a;
+    bool b;
+    bool c;
+
+    a receba FAL;
+    b receba VER;
+
+    c receba a E b;
+    saida(c);
+
+    c receba b OU a;
+    saida(c);
+
+    respost 0;
+]

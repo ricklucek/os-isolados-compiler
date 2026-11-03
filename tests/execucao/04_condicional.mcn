@@ -1,0 +1,24 @@
+inteira principal() @
+[
+    inteira valor;
+    inteira resultado;
+
+    valor receba 20;
+    resultado receba 0;
+
+    cond ( valor > 20 ) edai
+    [
+        resultado receba 1;
+    ]
+    casocontrario cond ( valor == 20 ) edai
+    [
+        resultado receba 2;
+    ]
+    casocontrario edai
+    [
+        resultado receba 3;
+    ]
+
+    saida(resultado);
+    respost resultado;
+]
