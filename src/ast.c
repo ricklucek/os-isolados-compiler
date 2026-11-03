@@ -1,5 +1,11 @@
 #include "ast.h"
 
+/*
+ * Estrutura e utilitarios da AST.
+ * Os nos possuem filhos dinamicos; a liberacao usa uma pilha explicita para
+ * evitar estouro da pilha C em arvores muito profundas.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -64,14 +70,77 @@ int ast_node_add_child(AstNode *parent, AstNode *child) {
     return 1;
 }
 
-void ast_free(AstNode *node) {
+typedef struct {
+    AstNode *node;
+    size_t next_child;
+} AstFreeFrame;
+
+static void ast_free_recursive_fallback(AstNode *node) {
     size_t i;
     if (node == NULL) return;
     for (i = 0U; i < node->child_count; ++i)
-        ast_free(node->children[i]);
+        ast_free_recursive_fallback(node->children[i]);
     free(node->children);
     free(node->lexeme);
     free(node);
+}
+
+void ast_free(AstNode *node) {
+    AstFreeFrame *stack;
+    size_t count = 0U;
+    size_t capacity = 64U;
+
+    if (node == NULL) return;
+
+    stack = malloc(capacity * sizeof(*stack));
+    if (stack == NULL) {
+        ast_free_recursive_fallback(node);
+        return;
+    }
+
+    stack[count].node = node;
+    stack[count].next_child = 0U;
+    ++count;
+
+    while (count > 0U) {
+        AstFreeFrame *frame = &stack[count - 1U];
+        AstNode *current = frame->node;
+
+        if (frame->next_child < current->child_count) {
+            AstNode *child = current->children[frame->next_child++];
+            AstFreeFrame *grown;
+
+            if (child == NULL) continue;
+            if (count == capacity) {
+                size_t new_capacity = capacity * 2U;
+                grown = realloc(stack, new_capacity * sizeof(*grown));
+                if (grown == NULL) {
+                    /*
+                     * Falha de memoria durante a limpeza: libera apenas esse
+                     * ramo recursivamente e continua usando a pilha existente.
+                     */
+                    ast_free_recursive_fallback(child);
+                    continue;
+                }
+                stack = grown;
+                capacity = new_capacity;
+                frame = &stack[count - 1U];
+                (void)frame;
+            }
+
+            stack[count].node = child;
+            stack[count].next_child = 0U;
+            ++count;
+            continue;
+        }
+
+        free(current->children);
+        free(current->lexeme);
+        free(current);
+        --count;
+    }
+
+    free(stack);
 }
 
 const char *ast_node_kind_name(AstNodeKind kind) {
