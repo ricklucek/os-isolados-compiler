@@ -2,9 +2,9 @@ inteira principal() @
 [
     inteira x;
     x receba 1;
-    cond ( x + 1 ) edai
+    cond ( x < ) edai
     [
-        respost 1;
+        x receba 2;
     ]
     respost 0;
 ]

@@ -62,9 +62,9 @@ A AST é a representação de entrada do analisador semântico.
 
 ## D08 — Símbolos usados nas estruturas, mas ausentes do alfabeto
 
-**Status: parcialmente adotada.**
+**Status: adotada.**
 
-`@` e `,` aparecem nas estruturas/exemplos e são reconhecidos pelo lexer, mesmo ausentes do alfabeto listado. Aspas/literais textuais continuam pendentes porque a especificação não fornece uma sintaxe para `palavra`.
+`@` e `,` aparecem nas estruturas/exemplos e são reconhecidos pelo lexer, mesmo ausentes do alfabeto listado. Aspas duplas são aceitas para o literal de `palavra` (D11). Após os programas de validação fornecidos posteriormente, `.` também foi reconhecido para acesso a campo de registro (D26).
 
 ## D09 — Operador lógico `NÃO` e alfabeto ASCII
 
@@ -141,17 +141,9 @@ A especificação apresenta declaração de variável como estrutura da linguage
 
 ## D17 — Regra de condição
 
-**Status: adotada literalmente.**
+**Status: revisada após avaliação.**
 
-A especificação declara explicitamente:
-
-```text
-CONDIÇÃO -> VAR COMPARADOR VAR
-CONDIÇÃO -> VAR COMPARADOR NUM
-CONDIÇÃO -> NUM COMPARADOR NUM
-```
-
-O parser não amplia essa produção para uma expressão booleana arbitrária. Operadores `OU`, `E`, `NÃO` e `XOR` continuam disponíveis em expressões gerais, mas uma condição de `cond`, `durante` ou `repete` deve seguir a forma explícita acima.
+A primeira versão seguia literalmente as três formas comparativas da especificação. O feedback mostrou que isso tornava inválidas condições booleanas naturais. A gramática passa a usar `condicao -> expressao`; a análise semântica exige resultado `bool`. Assim, `cond ( c )` e `cond ( a < 2 E b > 1 )` são válidos quando os tipos são compatíveis.
 
 ## D18 — Representação de declarações na AST
 
@@ -205,15 +197,15 @@ Conversões inversas são rejeitadas para evitar perda implícita de informaçã
 
 ## D25 — Retorno de funções
 
-**Status: adotada.**
+**Status: reforçada após avaliação.**
 
-Funções não-`vazio` devem possuir ao menos um `respost` e cada retorno deve ser compatível com a assinatura. Funções `vazio` aceitam ausência de retorno ou `respost;`, mas rejeitam `respost valor;`. A análise de fluxo completa para provar retorno em todos os caminhos não é realizada neste checkpoint.
+Cada `respost` é verificado contra a assinatura. Funções não-`vazio` também precisam garantir retorno: um retorno sequencial garante o bloco; um `cond` só garante retorno quando todos os ramos condicionais retornam e existe um `casocontrario` final que retorna. Laços são tratados conservadoramente e não garantem retorno por si só.
 
-## D26 — Campos de registro
+## D26 — Instância e acesso a campos de registro
 
-**Status: adotada parcialmente.**
+**Status: ampliada a partir dos programas de validação fornecidos.**
 
-Campos declarados dentro de um `registro` são verificados quanto a tipo, vetor e duplicidade em um escopo próprio do registro. A especificação não fornece sintaxe para instanciar ou acessar campos de registros, portanto nenhuma operação adicional sobre registros foi inventada.
+Os programas de nível introduzem `Cuidador responsavel;` e `responsavel.nome`. Passamos a aceitar `TipoRegistro variavel;` e `variavel.campo`. O tipo deve nomear um `registro` global e o campo precisa existir. O acesso é representado por `AST_FIELD_ACCESS`. Nesta etapa o suporte é intencionalmente direto para campos escalares, suficiente para os programas fornecidos.
 
 ## D27 — Comentários
 
@@ -230,3 +222,22 @@ O escopo do trabalho termina na validação semântica e não exige execução d
 ## Novas ambiguidades encontradas
 
 Toda nova lacuna deverá ser adicionada contendo descrição, decisão, justificativa e impacto na gramática ou semântica.
+
+
+## D29 — Função `principal` obrigatória
+
+**Status: adotada após avaliação.**
+
+Um programa completo deve declarar exatamente uma `principal`. A ausência, inclusive em arquivo vazio ou contendo apenas funções auxiliares, é erro semântico.
+
+## D30 — Limites defensivos do parser
+
+**Status: adotada após avaliação.**
+
+Entradas artificiais extremamente profundas podiam estourar a pilha C. O parser agora impõe limites defensivos de profundidade e complexidade, gerando erro sintático controlado em vez de `segmentation fault`. São limites de implementação, não regras da linguagem.
+
+## D31 — Faixa de índice constante de vetor
+
+**Status: adotada após avaliação.**
+
+Quando um índice é uma constante inteira determinável estaticamente, ele é comparado ao tamanho declarado. Acessos fora de `0 .. tamanho-1` são erros semânticos. Índices dinâmicos continuam sujeitos apenas à verificação de tipo.

@@ -82,10 +82,28 @@ A imagem de desenvolvimento usa Debian 12 com GCC, `make`, `entr` e os runtimes 
 
 ## Execução
 
-Pipeline completo — léxico, sintático, AST e semântico:
+Pipeline completo — léxico, sintático, AST e semântico. A extensão não é usada para decidir a linguagem; arquivos `.mac` e `.mcn` são aceitos:
 
 ```bash
-./macaronica caminho/para/programa.mac
+./macaronica caminho/para/programa.mcn
+```
+
+Validar um programa criado na linguagem:
+
+```bash
+make check FILE=caminho/para/programa.mcn
+```
+
+Validar mostrando tokens e AST:
+
+```bash
+make inspect FILE=caminho/para/programa.mcn
+```
+
+Validar todos os `.mcn`/`.mac` de uma pasta:
+
+```bash
+make check-dir DIR=caminho/da/pasta
 ```
 
 Exibir tokens:
@@ -162,6 +180,7 @@ make test-ast
 make test-semantic
 make test-robustness
 make test-delivery
+make test-levels
 ```
 
 Para uma verificação opcional com AddressSanitizer e UndefinedBehaviorSanitizer:
@@ -200,6 +219,14 @@ make test-delivery
 ```
 
 Há ainda `examples/programa_completo.mac`, que reúne em um único arquivo as principais estruturas da linguagem para demonstração.
+
+## Empacotamento para entrega
+
+```bash
+make package
+```
+
+O alvo cria `macaronica-entrega.zip` somente com arquivos versionados, evitando binários e `.o` acidentais.
 
 ## Limpeza
 
@@ -263,4 +290,4 @@ O objetivo não é decorar respostas, mas conseguir reconstruir o raciocínio do
 
 ## Uso de IA generativa
 
-Foi utilizada IA generativa como ferramenta de apoio na preparação da estrutura inicial do projeto, discussão de arquitetura, identificação de ambiguidades da especificação, revisão de código, elaboração de casos de teste e documentação. O grupo permanece responsável pelas decisões adotadas e pela compreensão integral do código entregue.
+Foi utilizado **ChatGPT, da OpenAI**, como ferramenta de apoio ao desenvolvimento. O apoio incluiu discussão de arquitetura, identificação de ambiguidades da especificação, geração e revisão de trechos de código, elaboração de testes, investigação de falhas, documentação e preparação do ambiente de validação. O grupo revisa as alterações integradas e permanece responsável pelas decisões adotadas e pela compreensão integral do código entregue.

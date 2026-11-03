@@ -1,0 +1,13 @@
+registro Cuidador @
+[
+    palavra nome;
+    inteira documento;
+]
+
+inteira principal() @
+[
+    Cuidador responsavel;
+    responsavel.nome receba "Ana";
+    responsavel.documento receba 123;
+    respost responsavel.documento;
+]
