@@ -795,7 +795,7 @@ static void analyze_return(SemanticContext *context, const AstNode *node) {
 }
 
 static void require_bool_condition(SemanticContext *context,
-                                   const AstNode *condition,
+                                   AstNode *condition,
                                    const char *construct_name) {
     LangType type = evaluate_expression(context, condition);
     if (type != LANG_TYPE_ERROR && type != LANG_TYPE_BOOL)
@@ -852,7 +852,11 @@ static void analyze_statement(SemanticContext *context, const AstNode *node) {
             analyze_assignment(context, node);
             break;
         case AST_CALL:
-            (void)evaluate_call(context, node);
+            /*
+             * Usa o caminho comum de expressao para que a chamada tambem
+             * receba a anotacao inferred_type consumida pelo back-end.
+             */
+            (void)evaluate_expression(context, node);
             break;
         case AST_RETURN:
             analyze_return(context, node);
