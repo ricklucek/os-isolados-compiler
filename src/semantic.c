@@ -29,7 +29,7 @@ static LangType evaluate_expression(SemanticContext *context,
                                     AstNode *node);
 static LangType evaluate_lvalue(SemanticContext *context,
                                 AstNode *node);
-static void analyze_statement(SemanticContext *context, const AstNode *node);
+static void analyze_statement(SemanticContext *context, AstNode *node);
 static void analyze_block(SemanticContext *context, const AstNode *block,
                           int create_scope, const char *scope_name);
 
@@ -840,7 +840,7 @@ static void analyze_for(SemanticContext *context, const AstNode *node) {
     analyze_block(context, node->children[3], 1, "repete");
 }
 
-static void analyze_statement(SemanticContext *context, const AstNode *node) {
+static void analyze_statement(SemanticContext *context, AstNode *node) {
     if (node == NULL || context->memory_error) return;
 
     switch (node->kind) {
