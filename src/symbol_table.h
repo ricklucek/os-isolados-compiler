@@ -12,6 +12,7 @@ typedef enum {
     LANG_TYPE_FLUT,
     LANG_TYPE_PALAVRA,
     LANG_TYPE_DUPLOCARPADO,
+    LANG_TYPE_RECORD,
     LANG_TYPE_VAZIO
 } LangType;
 
@@ -31,6 +32,7 @@ typedef struct {
     size_t vector_size;
     LangType *parameter_types;
     size_t parameter_count;
+    char *record_type_name;
     int line;
     int column;
 } Symbol;
@@ -74,6 +76,7 @@ const Symbol *symbol_table_lookup_global(const SymbolTable *table, const char *n
 SymbolDeclareStatus symbol_table_declare(
     SymbolTable *table, const char *name, SymbolKind kind, LangType type,
     size_t vector_size, const LangType *parameter_types, size_t parameter_count,
-    int line, int column, const Symbol **out_symbol);
+    const char *record_type_name, int line, int column,
+    const Symbol **out_symbol);
 
 #endif

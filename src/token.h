@@ -54,7 +54,8 @@ typedef enum {
     TOKEN_RIGHT_PAREN,
     TOKEN_SEMICOLON,
     TOKEN_COMMA,
-    TOKEN_AT
+    TOKEN_AT,
+    TOKEN_DOT
 } TokenType;
 
 typedef struct {

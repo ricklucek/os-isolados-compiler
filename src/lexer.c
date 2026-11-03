@@ -1,5 +1,11 @@
 #include "lexer.h"
 
+/*
+ * Analisador lexico da Macaronica.
+ * Percorre o fonte uma unica vez, preserva linha/coluna e produz TokenList.
+ * Erros lexicos recuperaveis geram TOKEN_INVALID sem interromper a varredura.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -180,6 +186,7 @@ static int scan_symbol(Lexer *lexer) {
         case ';': type = TOKEN_SEMICOLON; break;
         case ',': type = TOKEN_COMMA; break;
         case '@': type = TOKEN_AT; break;
+        case '.': type = TOKEN_DOT; break;
         case '/':
             if (lexer_peek(lexer) == '/') {
                 lexer_advance(lexer);

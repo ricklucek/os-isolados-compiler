@@ -93,6 +93,7 @@ const char *ast_node_kind_name(AstNodeKind kind) {
         case AST_FOR: return "FOR";
         case AST_CALL: return "CALL";
         case AST_VECTOR_ACCESS: return "VECTOR_ACCESS";
+        case AST_FIELD_ACCESS: return "FIELD_ACCESS";
         case AST_IDENTIFIER: return "IDENTIFIER";
         case AST_INTEGER_LITERAL: return "INTEGER_LITERAL";
         case AST_REAL_LITERAL: return "REAL_LITERAL";
