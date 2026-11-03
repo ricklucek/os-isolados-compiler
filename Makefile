@@ -31,14 +31,8 @@ inspect: $(TARGET)
 
 check-dir: $(TARGET)
 	@test -n "$(DIR)" || { echo "Uso: make check-dir DIR=caminho/diretorio"; exit 1; }
-	@set -e; found=0; \
-	for file in "$(DIR)"/*.mcn "$(DIR)"/*.mac; do \
-		[ -f "$file" ] || continue; \
-		found=1; \
-		echo "[VALIDANDO] $file"; \
-		./$(TARGET) "$file"; \
-	done; \
-	[ "$found" -eq 1 ] || { echo "Nenhum arquivo .mcn/.mac encontrado em $(DIR)."; exit 1; }
+	@test -n "$(strip $(wildcard $(DIR)/*.mcn $(DIR)/*.mac))" || { echo "Nenhum arquivo .mcn/.mac encontrado em $(DIR)."; exit 1; }
+	@set -e; $(foreach file,$(wildcard $(DIR)/*.mcn $(DIR)/*.mac),echo "[VALIDANDO] $(file)"; ./$(TARGET) "$(file)";)
 
 package:
 	@rm -f macaronica-entrega.zip
