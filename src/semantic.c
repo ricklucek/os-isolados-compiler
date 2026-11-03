@@ -26,10 +26,10 @@ typedef struct {
 } SemanticContext;
 
 static LangType evaluate_expression(SemanticContext *context,
-                                    const AstNode *node);
+                                    AstNode *node);
 static LangType evaluate_lvalue(SemanticContext *context,
-                                const AstNode *node);
-static void analyze_statement(SemanticContext *context, const AstNode *node);
+                                AstNode *node);
+static void analyze_statement(SemanticContext *context, AstNode *node);
 static void analyze_block(SemanticContext *context, const AstNode *block,
                           int create_scope, const char *scope_name);
 
@@ -643,38 +643,74 @@ static LangType evaluate_root(SemanticContext *context,
 }
 
 static LangType evaluate_expression(SemanticContext *context,
-                                    const AstNode *node) {
+                                    AstNode *node) {
+    LangType result = LANG_TYPE_ERROR;
+
     if (node == NULL || context->memory_error) return LANG_TYPE_ERROR;
 
     switch (node->kind) {
-        case AST_INTEGER_LITERAL: return LANG_TYPE_INTEIRA;
-        case AST_REAL_LITERAL: return LANG_TYPE_FLUT;
-        case AST_STRING_LITERAL: return LANG_TYPE_PALAVRA;
-        case AST_BOOL_LITERAL: return LANG_TYPE_BOOL;
-        case AST_IDENTIFIER: return evaluate_identifier(context, node);
-        case AST_VECTOR_ACCESS: return evaluate_vector_access(context, node);
-        case AST_FIELD_ACCESS: return evaluate_field_access(context, node);
-        case AST_CALL: return evaluate_call(context, node);
-        case AST_BINARY_EXPR: return evaluate_binary(context, node);
-        case AST_UNARY_EXPR: return evaluate_unary(context, node);
-        case AST_ROOT_EXPR: return evaluate_root(context, node);
+        case AST_INTEGER_LITERAL:
+            result = LANG_TYPE_INTEIRA;
+            break;
+        case AST_REAL_LITERAL:
+            result = LANG_TYPE_FLUT;
+            break;
+        case AST_STRING_LITERAL:
+            result = LANG_TYPE_PALAVRA;
+            break;
+        case AST_BOOL_LITERAL:
+            result = LANG_TYPE_BOOL;
+            break;
+        case AST_IDENTIFIER:
+            result = evaluate_identifier(context, node);
+            break;
+        case AST_VECTOR_ACCESS:
+            result = evaluate_vector_access(context, node);
+            break;
+        case AST_FIELD_ACCESS:
+            result = evaluate_field_access(context, node);
+            break;
+        case AST_CALL:
+            result = evaluate_call(context, node);
+            break;
+        case AST_BINARY_EXPR:
+            result = evaluate_binary(context, node);
+            break;
+        case AST_UNARY_EXPR:
+            result = evaluate_unary(context, node);
+            break;
+        case AST_ROOT_EXPR:
+            result = evaluate_root(context, node);
+            break;
         default:
             semantic_error(context, node,
                            "no %s nao pode ser usado como expressao",
                            ast_node_kind_name(node->kind));
-            return LANG_TYPE_ERROR;
+            result = LANG_TYPE_ERROR;
+            break;
     }
+
+    node->inferred_type = result;
+    return result;
 }
 
 static LangType evaluate_lvalue(SemanticContext *context,
-                                const AstNode *node) {
+                                AstNode *node) {
     const Symbol *symbol;
+    LangType result = LANG_TYPE_ERROR;
+
     if (node == NULL) return LANG_TYPE_ERROR;
 
-    if (node->kind == AST_VECTOR_ACCESS)
-        return evaluate_vector_access(context, node);
-    if (node->kind == AST_FIELD_ACCESS)
-        return evaluate_field_access(context, node);
+    if (node->kind == AST_VECTOR_ACCESS) {
+        result = evaluate_vector_access(context, node);
+        node->inferred_type = result;
+        return result;
+    }
+    if (node->kind == AST_FIELD_ACCESS) {
+        result = evaluate_field_access(context, node);
+        node->inferred_type = result;
+        return result;
+    }
 
     if (node->kind != AST_IDENTIFIER) {
         semantic_error(context, node,
@@ -695,7 +731,10 @@ static LangType evaluate_lvalue(SemanticContext *context,
                        symbol->name);
         return LANG_TYPE_ERROR;
     }
-    return symbol->type;
+
+    result = symbol->type;
+    node->inferred_type = result;
+    return result;
 }
 
 static void analyze_assignment(SemanticContext *context,
@@ -756,7 +795,7 @@ static void analyze_return(SemanticContext *context, const AstNode *node) {
 }
 
 static void require_bool_condition(SemanticContext *context,
-                                   const AstNode *condition,
+                                   AstNode *condition,
                                    const char *construct_name) {
     LangType type = evaluate_expression(context, condition);
     if (type != LANG_TYPE_ERROR && type != LANG_TYPE_BOOL)
@@ -801,7 +840,7 @@ static void analyze_for(SemanticContext *context, const AstNode *node) {
     analyze_block(context, node->children[3], 1, "repete");
 }
 
-static void analyze_statement(SemanticContext *context, const AstNode *node) {
+static void analyze_statement(SemanticContext *context, AstNode *node) {
     if (node == NULL || context->memory_error) return;
 
     switch (node->kind) {
@@ -813,7 +852,11 @@ static void analyze_statement(SemanticContext *context, const AstNode *node) {
             analyze_assignment(context, node);
             break;
         case AST_CALL:
-            (void)evaluate_call(context, node);
+            /*
+             * Usa o caminho comum de expressao para que a chamada tambem
+             * receba a anotacao inferred_type consumida pelo back-end.
+             */
+            (void)evaluate_expression(context, node);
             break;
         case AST_RETURN:
             analyze_return(context, node);

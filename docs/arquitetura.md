@@ -59,3 +59,18 @@ semantic(AstNode) -> SemanticResult
 ```
 
 A análise semântica não depende da `TokenList`: a AST copia os dados necessários, o que mantém as fases desacopladas.
+
+
+## Preparação para o back-end (Checkpoint 8)
+
+O sistema de tipos semânticos deixou de pertencer à tabela de símbolos e passou a `language_types.c/.h`. Isso evita que AST e futuros back-ends dependam conceitualmente da implementação da tabela de símbolos.
+
+Cada nó de expressão da AST possui `inferred_type`. A anotação é preenchida pela análise semântica somente depois que o parser constrói uma árvore válida. O futuro `codegen_llvm` deverá **consumir** essa anotação, e não repetir inferência de tipos.
+
+O fluxo passa a ser:
+
+```text
+fonte -> tokens -> AST estrutural -> semântico -> AST anotada -> codegen LLVM
+```
+
+Com `--parser-only --ast`, a árvore exibida é estrutural. Com execução completa e `--ast`, a impressão ocorre depois do semântico e inclui anotações como `{tipo=inteira}`, `{tipo=flut}` e `{tipo=bool}`.

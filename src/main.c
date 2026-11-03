@@ -135,12 +135,11 @@ int main(int argc, char *argv[]) {
     compiler_print_phase_success(stdout, COMPILER_PHASE_LEXICAL);
     compiler_print_phase_success(stdout, COMPILER_PHASE_SYNTACTIC);
 
-    if (print_ast) {
-        printf("AST:\n");
-        ast_print(ast, stdout);
-    }
-
     if (parser_only) {
+        if (print_ast) {
+            printf("AST:\n");
+            ast_print(ast, stdout);
+        }
         ast_free(ast);
         token_list_free(&tokens);
         return COMPILER_EXIT_OK;
@@ -164,6 +163,12 @@ int main(int argc, char *argv[]) {
     }
 
     compiler_print_phase_success(stdout, COMPILER_PHASE_SEMANTIC);
+
+    if (print_ast) {
+        printf("AST anotada:\n");
+        ast_print(ast, stdout);
+    }
+
     ast_free(ast);
     token_list_free(&tokens);
     return COMPILER_EXIT_OK;

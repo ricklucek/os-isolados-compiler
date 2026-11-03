@@ -5,7 +5,7 @@ TARGET := macaronica
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir package test test-lexer test-parser test-ast test-semantic test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir package test test-lexer test-parser test-ast test-semantic test-backend-prep test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -39,7 +39,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -103,6 +103,17 @@ test-semantic: $(TARGET)
 	done
 	@echo "Todos os testes semanticos passaram."
 
+test-backend-prep: $(TARGET)
+	@echo "== Preparacao da AST para o backend =="
+	@./$(TARGET) tests/validos/semantic_08_tipos_backend.mac --ast > .typed-ast.out
+	@grep -Fq 'BINARY_EXPR [+] {tipo=flut}' .typed-ast.out
+	@grep -Fq 'BINARY_EXPR [E] {tipo=bool}' .typed-ast.out
+	@grep -Fq 'STRING_LITERAL ["ok"] {tipo=palavra}' .typed-ast.out
+	@grep -Fq 'CALL [saida] {tipo=vazio}' .typed-ast.out
+	@grep -Fq 'BINARY_EXPR [+] {tipo=duplocarpado}' .typed-ast.out
+	@rm -f .typed-ast.out
+	@echo "AST anotada contem os tipos necessarios ao backend."
+
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
 	@sh tests/robustez/run.sh ./$(TARGET)
@@ -143,4 +154,4 @@ docker-sanitize:
 	docker compose run --rm dev sh -lc 'make test-sanitize'
 
 clean:
-	rm -f $(OBJ) $(TARGET) .ast-test.out .robustness-test.out .robustness-test.err macaronica-entrega.zip
+	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err macaronica-entrega.zip
