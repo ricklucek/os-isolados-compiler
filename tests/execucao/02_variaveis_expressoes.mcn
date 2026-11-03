@@ -1,0 +1,12 @@
+inteira principal() @
+[
+    inteira a;
+    inteira b;
+    inteira resultado;
+
+    a receba 6;
+    b receba 7;
+    resultado receba a * b;
+
+    respost resultado;
+]

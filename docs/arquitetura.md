@@ -74,3 +74,27 @@ fonte -> tokens -> AST estrutural -> semântico -> AST anotada -> codegen LLVM
 ```
 
 Com `--parser-only --ast`, a árvore exibida é estrutural. Com execução completa e `--ast`, a impressão ocorre depois do semântico e inclui anotações como `{tipo=inteira}`, `{tipo=flut}` e `{tipo=bool}`.
+
+
+## Back-end LLVM — Checkpoint 9
+
+O módulo `codegen_llvm.c/.h` recebe exclusivamente uma AST já validada e anotada. A geração textual não participa de lexer, parser ou inferência de tipos.
+
+O caminho funcional inicial é:
+
+```text
+programa.mcn
+ -> front-end
+ -> AST anotada
+ -> codegen_llvm
+ -> programa.ll
+ -> llvm-as / opt -passes=verify
+ -> lli
+ ou
+ -> clang + runtime/zl_runtime_posix.c
+ -> executável
+```
+
+A função da linguagem `principal` vira `@zl_principal`. O runtime POSIX fornece `main` e a camada de E/S. O IR não contém `target triple` nem `target datalayout`, preservando a escolha posterior do alvo.
+
+O Checkpoint 9 usa deliberadamente a forma em memória (`alloca/load/store`). A promoção para SSA é responsabilidade do `mem2reg`, conforme `docs/decisoes_backend.md`.

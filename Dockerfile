@@ -1,10 +1,13 @@
-FROM debian:12-slim
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
+        clang-18 \
+        llvm-18 \
+        lld-18 \
         entr \
         gawk \
         libasan8 \

@@ -47,7 +47,7 @@ O projeto é compilado normalmente com:
 
 ## Ferramentas da Parte 2
 
-A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. Os próximos checkpoints usarão `llvm-as`, `opt`, `lli`, `clang`, `mlir-opt` e `mlir-translate`. O Checkpoint 8 apenas prepara a representação interna; a integração dessas ferramentas ao ambiente Docker começa com o gerador LLVM.
+A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. O Checkpoint 9 já usa `llvm-as-18`, `opt-18`, `lli-18` e `clang-18` para validar e executar a primeira geração LLVM. MLIR será incorporado nos checkpoints do PjBL 4.
 
 As decisões de geração, portabilidade e comportamento dependente do alvo ficam em `docs/decisoes_backend.md`.
 
@@ -85,7 +85,7 @@ Para recompilar e testar automaticamente sempre que um arquivo `.c` ou `.h` muda
 make watch
 ```
 
-A imagem de desenvolvimento usa Debian 12 com GCC, `make`, `entr` e os runtimes de AddressSanitizer/UndefinedBehaviorSanitizer. O arquivo `.gitattributes` força finais de linha LF nos scripts e fontes relevantes, inclusive quando o repositório é usado em Windows.
+A imagem de desenvolvimento usa Ubuntu 24.04 com GCC, LLVM/Clang 18, `make`, `entr` e os runtimes de AddressSanitizer/UndefinedBehaviorSanitizer. O arquivo `.gitattributes` força finais de linha LF nos scripts e fontes relevantes, inclusive quando o repositório é usado em Windows.
 
 ## Execução
 
@@ -157,6 +157,30 @@ Demonstração completa com fluxo de tokens e AST:
 make demo
 ```
 
+## Geração LLVM IR — PjBL 3
+
+Depois de o programa passar por lexer, parser e semântico, a opção `-o` gera LLVM IR textual:
+
+```bash
+./macaronica programa.mcn -o programa.ll
+```
+
+Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. No Checkpoint 9, o gerador cobre `principal` inteira sem parâmetros, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, XOR, unários e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Construções ainda não rebaixadas geram diagnóstico de codegen em vez de IR inválida.
+
+Validar um arquivo e a IR com LLVM:
+
+```bash
+make emit-llvm FILE=tests/execucao/02_variaveis_expressoes.mcn OUT=programa.ll
+```
+
+Gerar, ligar com `runtime/zl_runtime_posix.c` e executar:
+
+```bash
+make run-llvm FILE=tests/execucao/03_saida_tipos.mcn
+```
+
+O código gerado define `@zl_principal`; o `main` real fica no runtime da plataforma.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -169,6 +193,8 @@ make demo
 | 5 | falha interna/memória no parser |
 | 6 | erro semântico |
 | 7 | falha interna/memória no analisador semântico |
+| 8 | construção válida ainda não suportada pelo codegen LLVM |
+| 9 | falha interna/de escrita no codegen LLVM |
 
 ## Testes
 
@@ -185,6 +211,8 @@ make test-lexer
 make test-parser
 make test-ast
 make test-semantic
+make test-backend-prep
+make test-llvm
 make test-robustness
 make test-delivery
 make test-levels
@@ -284,8 +312,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 5 — tratamento de erros e robustez — concluído
 - Checkpoint 6 — testes e documentação final — concluído
 - Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído
-- Checkpoint 8 — AST anotada e contrato do back-end — concluído nesta entrega
-- Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — próximo
+- Checkpoint 8 — AST anotada e contrato do back-end — concluído
+- Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído nesta entrega
+- Checkpoint 10 — LLVM: condicionais e laços — próximo
 
 
 ## Material de estudo e apresentação

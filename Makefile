@@ -2,10 +2,15 @@ CC := gcc
 CFLAGS := -std=c99 -Wall -Wextra -pedantic
 LDFLAGS :=
 TARGET := macaronica
+LLVM_AS ?= llvm-as-18
+LLVM_OPT ?= opt-18
+LLVM_LLI ?= lli-18
+CLANG_LLVM ?= clang-18
+
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir package test test-lexer test-parser test-ast test-semantic test-backend-prep test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -34,12 +39,24 @@ check-dir: $(TARGET)
 	@test -n "$(strip $(wildcard $(DIR)/*.mcn $(DIR)/*.mac))" || { echo "Nenhum arquivo .mcn/.mac encontrado em $(DIR)."; exit 1; }
 	@set -e; $(foreach file,$(wildcard $(DIR)/*.mcn $(DIR)/*.mac),echo "[VALIDANDO] $(file)"; ./$(TARGET) "$(file)";)
 
+emit-llvm: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make emit-llvm FILE=programa.mcn [OUT=programa.ll]"; exit 1; }
+	@./$(TARGET) "$(FILE)" -o "$(if $(OUT),$(OUT),programa.ll)"
+	@$(LLVM_AS) "$(if $(OUT),$(OUT),programa.ll)" -o /dev/null
+	@$(LLVM_OPT) -passes=verify "$(if $(OUT),$(OUT),programa.ll)" -disable-output
+	@echo "LLVM IR validada."
+
+run-llvm: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
+		sh scripts/run_llvm.sh "$(FILE)" ./$(TARGET)
+
 package:
 	@rm -f macaronica-entrega.zip
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -114,6 +131,11 @@ test-backend-prep: $(TARGET)
 	@rm -f .typed-ast.out
 	@echo "AST anotada contem os tipos necessarios ao backend."
 
+test-llvm: $(TARGET)
+	@echo "== Geracao e validacao LLVM IR =="
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LLI="$(LLVM_LLI)" \
+		CLANG_LLVM="$(CLANG_LLVM)" sh tests/execucao/run.sh ./$(TARGET)
+
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
 	@sh tests/robustez/run.sh ./$(TARGET)
@@ -154,4 +176,6 @@ docker-sanitize:
 	docker compose run --rm dev sh -lc 'make test-sanitize'
 
 clean:
-	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err macaronica-entrega.zip
+	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
+		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-invalid.ll \
+		.llvm-run.ll .llvm-run macaronica-entrega.zip
