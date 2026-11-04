@@ -1,6 +1,4 @@
-inteira principal() @
+vazio principal() @
 [
-    inteira vet{3} valores;
-    valores{0} receba 1;
-    respost 0;
+    respost;
 ]

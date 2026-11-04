@@ -11,13 +11,14 @@ IR=.llvm-test.ll
 BC=.llvm-test.bc
 PROG=.llvm-test-prog
 OUT=.llvm-test.out
+ERR=.llvm-test.err
 EXPECTED=.llvm-test.expected
 INVALID=.llvm-invalid.ll
 UNSUPPORTED=.llvm-unsupported.ll
 M2R=.llvm-mem2reg.ll
 
 cleanup() {
-    rm -f "$IR" "$BC" "$PROG" "$OUT" "$EXPECTED" "$INVALID" "$UNSUPPORTED" "$M2R"
+    rm -f "$IR" "$BC" "$PROG" "$OUT" "$ERR" "$EXPECTED" "$INVALID" "$UNSUPPORTED" "$M2R"
 }
 trap cleanup EXIT INT TERM
 cleanup
@@ -241,11 +242,81 @@ status=0
 [ "$status" -eq 104 ] ||
     fail "expoente inteiro negativo esperava exit 104 e recebeu $status"
 
+"$BIN" tests/execucao/15_vetores.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou vetores"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou vetores"
+grep -Fq 'getelementptr [4 x i32]' "$IR" ||
+    fail "GEP de vetor inteiro ausente"
+grep -Fq 'getelementptr [2 x ptr]' "$IR" ||
+    fail "GEP de vetor palavra ausente"
+grep -Fq 'call void @zl_erro_execucao(i32 1' "$IR" ||
+    fail "bounds check de vetor nao chama erro de execucao"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou vetores"
+status=0
+"./$PROG" > "$OUT" || status=$?
+[ "$status" -eq 12 ] ||
+    fail "programa de vetores esperava codigo 12 e recebeu $status"
+tr -d '\r' < tests/execucao/15_vetores.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de vetores divergiu"
+
+"$BIN" tests/execucao/16_registro.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou registro"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou registro"
+grep -Fq '%struct.Pessoa = type { ptr, i32, float }' "$IR" ||
+    fail "layout LLVM de Pessoa ausente/incorreto"
+grep -Fq 'getelementptr %struct.Pessoa' "$IR" ||
+    fail "GEP de campo de registro ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou registro"
+status=0
+"./$PROG" > "$OUT" || status=$?
+[ "$status" -eq 30 ] ||
+    fail "registro esperava codigo 30 e recebeu $status"
+tr -d '\r' < tests/execucao/16_registro.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de registro divergiu"
+
+"$BIN" tests/execucao/17_agregados_globais.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou agregados globais"
+"$LLVM_AS" "$IR" -o /dev/null ||
+    fail "llvm-as rejeitou agregados globais"
+grep -Fq '@valores = global [3 x i32] zeroinitializer' "$IR" ||
+    fail "vetor global ausente"
+grep -Fq '@config = global %struct.Config zeroinitializer' "$IR" ||
+    fail "registro global ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou agregados globais"
+status=0
+"./$PROG" > "$OUT" || status=$?
+[ "$status" -eq 13 ] ||
+    fail "agregados globais esperavam codigo 13 e receberam $status"
+tr -d '\r' < tests/execucao/17_agregados_globais.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de agregados globais divergiu"
+
+"$BIN" tests/execucao/18_erro_indice_dinamico.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou caso de bounds dinamico"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou bounds dinamico"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou bounds dinamico"
+status=0
+"./$PROG" > "$OUT" 2> "$ERR" || status=$?
+[ "$status" -eq 101 ] ||
+    fail "indice fora dos limites esperava exit 101 e recebeu $status"
+grep -Fq 'codigo=1, linha=7' "$ERR" ||
+    fail "erro de indice nao informou codigo/linha esperados"
+
 status=0
 "$BIN" tests/execucao/99_ainda_nao_suportado.mcn     -o "$UNSUPPORTED" >/dev/null 2>&1 || status=$?
 [ "$status" -eq 8 ] ||
-    fail "vetor ainda nao rebaixado deveria retornar exit 8, recebeu $status"
+    fail "principal vazio fora do contrato deveria retornar exit 8, recebeu $status"
 [ ! -e "$UNSUPPORTED" ] ||
     fail "falha controlada de codegen deixou LLVM parcial"
 
-echo "LLVM IR valida, funcoes/recursao/matematica executaveis e portaveis nos casos do checkpoint."
+echo "LLVM IR valida, vetores/registros/bounds executaveis e portaveis nos casos do checkpoint."
