@@ -98,3 +98,12 @@ programa.mcn
 A função da linguagem `principal` vira `@zl_principal`. O runtime POSIX fornece `main` e a camada de E/S. O IR não contém `target triple` nem `target datalayout`, preservando a escolha posterior do alvo.
 
 O Checkpoint 9 usa deliberadamente a forma em memória (`alloca/load/store`). A promoção para SSA é responsabilidade do `mem2reg`, conforme `docs/decisoes_backend.md`.
+
+
+## Funções e chamadas no back-end
+
+No Checkpoint 11, o contexto de geração mantém uma referência para a AST global. Ao gerar um `AST_CALL`, o backend localiza a função correspondente, lê sua assinatura e gera os argumentos antes do `call`, aplicando as promoções numéricas necessárias.
+
+Cada função reinicia os contadores de temporários/rótulos e sua tabela local de armazenamentos, enquanto variáveis globais e literais permanecem compartilhados pelo módulo. Isso permite recursão sem compartilhar estado local entre funções.
+
+O runtime continua separado das funções da linguagem: apenas operações dependentes da plataforma, E/S, erros e helpers matemáticos `zl_*` pertencem a `runtime/`.
