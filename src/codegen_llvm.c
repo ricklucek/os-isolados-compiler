@@ -14,6 +14,7 @@
  */
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1235,6 +1236,8 @@ static LlvmValue generate_expression(CodegenContext *context,
 
         case AST_REAL_LITERAL: {
             float rounded;
+            double exact;
+            uint64_t bits;
             number = strtod(node->lexeme != NULL ? node->lexeme : "0",
                             &end);
             if (end == node->lexeme) {
@@ -1244,12 +1247,16 @@ static LlvmValue generate_expression(CodegenContext *context,
             }
 
             /*
-             * A forma hexadecimal C99 preserva exatamente o valor binary32.
-             * Isso evita literais decimais que o parser LLVM rejeita quando
-             * nao representam exatamente um float (por exemplo, 1.65).
+             * LLVM 18 aceita a forma legada 0x + 16 hexadecimais para
+             * float/double. Para um literal Macaronica (flut), primeiro
+             * arredondamos para binary32 e depois promovemos esse valor exato
+             * a double apenas para serializar o bitstring exigido pela IR.
              */
             rounded = (float)number;
-            snprintf(literal, sizeof(literal), "%a", (double)rounded);
+            exact = (double)rounded;
+            memcpy(&bits, &exact, sizeof(bits));
+            snprintf(literal, sizeof(literal), "0x%016llX",
+                     (unsigned long long)bits);
             return make_value(LANG_TYPE_FLUT, literal);
         }
 
