@@ -1,0 +1,8 @@
+inteira principal() @
+[
+    inteira valor;
+
+    valor receba 2 ^ -1;
+    saida(valor);
+    respost 0;
+]

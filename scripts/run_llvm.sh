@@ -24,7 +24,7 @@ cleanup
 "$BIN" "$SOURCE" -o "$IR" || exit $?
 "$LLVM_AS" "$IR" -o /dev/null || exit $?
 "$LLVM_OPT" -passes=verify "$IR" -disable-output || exit $?
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" || exit $?
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" || exit $?
 
 status=0
 "./$PROG" || status=$?

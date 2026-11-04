@@ -1,0 +1,18 @@
+outrafuncao bool efeito() @
+[
+    saida(99);
+    respost VER;
+]
+
+inteira principal() @
+[
+    bool resultado;
+
+    resultado receba FAL E efeito();
+    saida(resultado);
+
+    resultado receba VER OU efeito();
+    saida(resultado);
+
+    respost 0;
+]

@@ -1,0 +1,15 @@
+inteira principal() @
+[
+    inteira potenciaInteira;
+    flut raizValor;
+    flut potenciaReal;
+
+    potenciaInteira receba 2 ^ 5;
+    raizValor receba raiz(81);
+    potenciaReal receba 2.0 ^ 3.0;
+
+    saida(potenciaInteira);
+    saida(raizValor);
+    saida(potenciaReal);
+    respost 0;
+]

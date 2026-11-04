@@ -1,0 +1,22 @@
+outrafuncao inteira quadrado(inteira n) @
+[
+    respost n * n;
+]
+
+outrafuncao flut media(inteira a, flut b) @
+[
+    respost (a + b) / 2;
+]
+
+inteira principal() @
+[
+    inteira q;
+    flut m;
+
+    q receba quadrado(5);
+    m receba media(2, 4);
+
+    saida(q);
+    saida(m);
+    respost 0;
+]

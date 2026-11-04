@@ -48,7 +48,7 @@ status=0
 [ "$status" -eq 42 ] ||
     fail "lli esperava codigo 42 e recebeu $status"
 
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou IR + runtime POSIX"
 
 status=0
@@ -70,7 +70,7 @@ status=0
     fail "nao gerou programa de saida"
 "$LLVM_OPT" -passes=verify "$IR" -disable-output ||
     fail "verify rejeitou programa de saida"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou programa de saida"
 "./$PROG" > "$OUT" || fail "programa de saida retornou erro"
 tr -d '\r' < tests/execucao/03_saida_tipos.esperado > "$EXPECTED"
@@ -87,7 +87,7 @@ fi
     fail "nao gerou condicional"
 "$LLVM_OPT" -passes=verify "$IR" -disable-output ||
     fail "verify rejeitou condicional"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou condicional"
 status=0
 "./$PROG" > "$OUT" || status=$?
@@ -107,7 +107,7 @@ grep -q 'for.cond' "$IR" || fail "IR nao contem for"
     fail "mem2reg falhou no programa com lacos"
 grep -q 'phi i32' "$M2R" ||
     fail "mem2reg nao produziu phi i32 para variaveis do laco"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou lacos"
 status=0
 "./$PROG" > "$OUT" || status=$?
@@ -127,7 +127,7 @@ grep -q 'and.rhs' "$IR" ||
     fail "IR nao contem bloco do lado direito de E"
 grep -q 'or.rhs' "$IR" ||
     fail "IR nao contem bloco do lado direito de OU"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou curto-circuito"
 "./$PROG" > "$OUT" || fail "programa de curto-circuito retornou erro"
 tr -d '\r' < tests/execucao/06_curto_circuito.esperado > "$EXPECTED"
@@ -142,12 +142,91 @@ grep -q '%x.addr = alloca i32' "$IR" ||
     fail "armazenamento externo de x ausente"
 grep -q '%x.1.addr = alloca i32' "$IR" ||
     fail "armazenamento sombreado de x nao recebeu nome unico"
-"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -o "$PROG" ||
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou sombreamento"
 "./$PROG" > "$OUT" || fail "programa de sombreamento retornou erro"
 tr -d '\r' < tests/execucao/07_escopo_sombreamento.esperado > "$EXPECTED"
 cmp -s "$OUT" "$EXPECTED" ||
     fail "saida do sombreamento divergiu"
+
+"$BIN" tests/execucao/08_funcoes_chamadas.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou funcoes e chamadas"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou funcoes e chamadas"
+grep -q 'define i32 @quadrado(i32 %arg0) nounwind' "$IR" ||
+    fail "assinatura LLVM de quadrado ausente"
+grep -q 'call i32 @quadrado(i32 5) nounwind' "$IR" ||
+    fail "call de quadrado ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou funcoes e chamadas"
+"./$PROG" > "$OUT" || fail "programa de funcoes retornou erro"
+tr -d '\r' < tests/execucao/08_funcoes_chamadas.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de funcoes divergiu"
+
+"$BIN" tests/execucao/09_recursao_forward.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou recursao/forward call"
+"$LLVM_AS" "$IR" -o /dev/null ||
+    fail "llvm-as rejeitou recursao"
+grep -q 'call i32 @fatorial' "$IR" ||
+    fail "chamada recursiva de fatorial ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou recursao"
+"./$PROG" > "$OUT" || fail "programa recursivo retornou erro"
+tr -d '\r' < tests/execucao/09_recursao_forward.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida da recursao divergiu"
+
+"$BIN" tests/execucao/10_funcao_vazio.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou funcao vazio"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou funcao vazio"
+grep -q 'define void @mostrar(i32 %arg0) nounwind' "$IR" ||
+    fail "assinatura void de mostrar ausente"
+grep -q 'call void @mostrar(i32 7) nounwind' "$IR" ||
+    fail "call void de mostrar ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou funcao vazio"
+"./$PROG" > "$OUT" || fail "funcao vazio retornou erro"
+tr -d '\r' < tests/execucao/10_funcao_vazio.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de funcao vazio divergiu"
+
+"$BIN" tests/execucao/11_potencia_raiz.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou potencia/raiz"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou potencia/raiz"
+grep -q '@zl_pow_i32' "$IR" || fail "helper de potencia inteira ausente"
+grep -q '@zl_pow_flut' "$IR" || fail "helper de potencia real ausente"
+grep -q '@zl_raiz_flut' "$IR" || fail "helper de raiz ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou potencia/raiz"
+"./$PROG" > "$OUT" || fail "programa de potencia/raiz retornou erro"
+tr -d '\r' < tests/execucao/11_potencia_raiz.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de potencia/raiz divergiu"
+
+"$BIN" tests/execucao/12_curto_circuito_chamada.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou curto-circuito com chamada"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou curto-circuito com chamada"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou curto-circuito com chamada"
+"./$PROG" > "$OUT" || fail "curto-circuito com chamada retornou erro"
+tr -d '\r' < tests/execucao/12_curto_circuito_chamada.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" ||
+    fail "lado direito do curto-circuito foi avaliado indevidamente"
+
+"$BIN" tests/execucao/13_erro_expoente_negativo.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou caso de erro de expoente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou erro de expoente"
+status=0
+"./$PROG" >/dev/null 2>&1 || status=$?
+[ "$status" -eq 104 ] ||
+    fail "expoente inteiro negativo esperava exit 104 e recebeu $status"
 
 status=0
 "$BIN" tests/execucao/99_ainda_nao_suportado.mcn     -o "$UNSUPPORTED" >/dev/null 2>&1 || status=$?
@@ -156,4 +235,4 @@ status=0
 [ ! -e "$UNSUPPORTED" ] ||
     fail "falha controlada de codegen deixou LLVM parcial"
 
-echo "LLVM IR valida, controle de fluxo executavel e portavel nos casos do checkpoint."
+echo "LLVM IR valida, funcoes/recursao/matematica executaveis e portaveis nos casos do checkpoint."
