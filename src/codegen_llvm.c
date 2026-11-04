@@ -3,12 +3,12 @@
 /*
  * Primeiro back-end LLVM da Macaronica.
  *
- * O Checkpoint 11 acrescenta:
- * - funcoes de usuario, parametros, chamadas, retorno e recursao;
- * - funcoes vazio;
- * - ^ e raiz() por helpers de runtime de assinatura fixa.
+ * O Checkpoint 12 acrescenta:
+ * - vetores locais/globais com getelementptr;
+ * - registros nomeados LLVM e acesso a campos;
+ * - verificacao dinamica de limites antes de cada acesso vetorial.
  *
- * Vetores e registros permanecem para o checkpoint seguinte. Quando um programa valido usa uma
+ * A IR continua sem offsets manuais, target triple ou target datalayout. Quando um programa valido usa uma
  * construcao ainda nao rebaixada, o gerador falha de forma controlada e o
  * arquivo de saida e removido pelo chamador.
  */
@@ -28,6 +28,9 @@ typedef struct {
     char llvm_name[LLVM_OPERAND_CAPACITY];
     int active;
     size_t scope_depth;
+    int is_vector;
+    size_t vector_size;
+    const char *record_type_name;
 } Storage;
 
 typedef struct {
@@ -41,6 +44,12 @@ typedef struct {
     char operand[LLVM_OPERAND_CAPACITY];
     int valid;
 } LlvmValue;
+
+typedef struct {
+    LangType type;
+    char pointer[LLVM_OPERAND_CAPACITY];
+    int valid;
+} LlvmAddress;
 
 typedef struct {
     FILE *out;
@@ -106,6 +115,163 @@ static const char *llvm_type(LangType type) {
         case LANG_TYPE_VAZIO: return "void";
         default: return NULL;
     }
+}
+
+static size_t vector_size_from_declaration(const AstNode *node) {
+    char *end = NULL;
+    unsigned long long value;
+
+    if (node == NULL || node->kind != AST_VECTOR_DECL ||
+        node->child_count == 0U || node->children[0] == NULL ||
+        node->children[0]->lexeme == NULL)
+        return 0U;
+
+    value = strtoull(node->children[0]->lexeme, &end, 10);
+    if (end == node->children[0]->lexeme || *end != '\0')
+        return 0U;
+
+    return (size_t)value;
+}
+
+static size_t declaration_first_identifier(const AstNode *node) {
+    return node != NULL && node->kind == AST_VECTOR_DECL ? 1U : 0U;
+}
+
+static const AstNode *find_record_definition(const CodegenContext *context,
+                                             const char *name) {
+    size_t i;
+
+    if (context == NULL || context->program == NULL || name == NULL)
+        return NULL;
+
+    for (i = 0U; i < context->program->child_count; ++i) {
+        const AstNode *node = context->program->children[i];
+        if (node != NULL && node->kind == AST_RECORD &&
+            node->lexeme != NULL && strcmp(node->lexeme, name) == 0)
+            return node;
+    }
+
+    return NULL;
+}
+
+static int record_field_info(const CodegenContext *context,
+                             const char *record_name,
+                             const char *field_name,
+                             size_t *out_index,
+                             LangType *out_type,
+                             size_t *out_vector_size) {
+    const AstNode *record;
+    size_t field_index = 0U;
+    size_t i;
+
+    record = find_record_definition(context, record_name);
+    if (record == NULL || field_name == NULL) return 0;
+
+    for (i = 0U; i < record->child_count; ++i) {
+        const AstNode *declaration = record->children[i];
+        LangType type;
+        size_t first;
+        size_t j;
+        size_t vector_size = 0U;
+
+        if (declaration == NULL ||
+            (declaration->kind != AST_VAR_DECL &&
+             declaration->kind != AST_VECTOR_DECL))
+            continue;
+
+        type = lang_type_from_token(declaration->token_type);
+        first = declaration_first_identifier(declaration);
+        if (declaration->kind == AST_VECTOR_DECL)
+            vector_size = vector_size_from_declaration(declaration);
+
+        for (j = first; j < declaration->child_count; ++j) {
+            const AstNode *identifier = declaration->children[j];
+            if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
+                continue;
+
+            if (identifier->lexeme != NULL &&
+                strcmp(identifier->lexeme, field_name) == 0) {
+                if (out_index != NULL) *out_index = field_index;
+                if (out_type != NULL) *out_type = type;
+                if (out_vector_size != NULL) *out_vector_size = vector_size;
+                return 1;
+            }
+            ++field_index;
+        }
+    }
+
+    return 0;
+}
+
+static int emit_record_type(CodegenContext *context,
+                            const AstNode *record) {
+    size_t i;
+    int first_field = 1;
+
+    if (record == NULL || record->kind != AST_RECORD ||
+        record->lexeme == NULL)
+        return 0;
+
+    fprintf(context->out, "%%struct.%s = type { ", record->lexeme);
+
+    for (i = 0U; i < record->child_count; ++i) {
+        const AstNode *declaration = record->children[i];
+        LangType type;
+        const char *type_name;
+        size_t first;
+        size_t j;
+        size_t vector_size = 0U;
+
+        if (declaration == NULL ||
+            (declaration->kind != AST_VAR_DECL &&
+             declaration->kind != AST_VECTOR_DECL))
+            continue;
+
+        type = lang_type_from_token(declaration->token_type);
+        type_name = llvm_type(type);
+        if (type_name == NULL) {
+            codegen_error(context, declaration,
+                          "campo de registro possui tipo LLVM nao suportado");
+            return 0;
+        }
+
+        first = declaration_first_identifier(declaration);
+        if (declaration->kind == AST_VECTOR_DECL)
+            vector_size = vector_size_from_declaration(declaration);
+
+        for (j = first; j < declaration->child_count; ++j) {
+            const AstNode *identifier = declaration->children[j];
+            if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
+                continue;
+
+            if (!first_field) fprintf(context->out, ", ");
+            if (declaration->kind == AST_VECTOR_DECL)
+                fprintf(context->out, "[%zu x %s]", vector_size, type_name);
+            else
+                fprintf(context->out, "%s", type_name);
+            first_field = 0;
+        }
+    }
+
+    fprintf(context->out, " }\n");
+    return 1;
+}
+
+static int emit_record_types(CodegenContext *context,
+                             const AstNode *program) {
+    size_t i;
+    int emitted = 0;
+
+    for (i = 0U; i < program->child_count; ++i) {
+        const AstNode *node = program->children[i];
+        if (node != NULL && node->kind == AST_RECORD) {
+            if (!emit_record_type(context, node)) return 0;
+            emitted = 1;
+        }
+    }
+
+    if (emitted) fputc('\n', context->out);
+    return 1;
 }
 
 static int grow_storage(Storage **items, size_t *capacity, size_t count) {
@@ -357,6 +523,23 @@ static LlvmValue make_value(LangType type, const char *operand) {
     return value;
 }
 
+static LlvmAddress invalid_address(void) {
+    LlvmAddress address;
+    memset(&address, 0, sizeof(address));
+    address.type = LANG_TYPE_ERROR;
+    address.valid = 0;
+    return address;
+}
+
+static LlvmAddress make_address(LangType type, const char *pointer) {
+    LlvmAddress address;
+    memset(&address, 0, sizeof(address));
+    address.type = type;
+    address.valid = 1;
+    snprintf(address.pointer, sizeof(address.pointer), "%s", pointer);
+    return address;
+}
+
 static const AstNode *find_callable(const CodegenContext *context,
                                     const char *name) {
     size_t i;
@@ -494,6 +677,188 @@ static LlvmValue generate_short_circuit(CodegenContext *context,
     return make_value(LANG_TYPE_BOOL, result);
 }
 
+static LlvmAddress generate_vector_address(CodegenContext *context,
+                                                const AstNode *node) {
+    const Storage *storage;
+    LlvmValue index;
+    const char *element_type;
+    char base_pointer[LLVM_OPERAND_CAPACITY];
+    char lower[LLVM_OPERAND_CAPACITY];
+    char upper[LLVM_OPERAND_CAPACITY];
+    char in_bounds[LLVM_OPERAND_CAPACITY];
+    char ok_label[LLVM_OPERAND_CAPACITY];
+    char error_label[LLVM_OPERAND_CAPACITY];
+    char element_pointer[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->child_count == 0U)
+        return invalid_address();
+
+    storage = lookup_storage(context, node->lexeme);
+    if (storage == NULL || !storage->is_vector) {
+        codegen_error(context, node,
+                      "'%s' nao possui armazenamento vetorial LLVM",
+                      node->lexeme != NULL ? node->lexeme : "<sem-nome>");
+        return invalid_address();
+    }
+
+    index = generate_expression(context, node->children[0]);
+    if (!index.valid || index.type != LANG_TYPE_INTEIRA) {
+        codegen_error(context, node,
+                      "indice vetorial LLVM deve produzir i32");
+        return invalid_address();
+    }
+
+    new_temp(context, lower);
+    new_temp(context, upper);
+    new_temp(context, in_bounds);
+    fprintf(context->out, "  %s = icmp sge i32 %s, 0\n",
+            lower, index.operand);
+    fprintf(context->out, "  %s = icmp slt i32 %s, %zu\n",
+            upper, index.operand, storage->vector_size);
+    fprintf(context->out, "  %s = and i1 %s, %s\n",
+            in_bounds, lower, upper);
+
+    new_label(context, "bounds.ok", ok_label);
+    new_label(context, "bounds.error", error_label);
+    emit_cond_branch(context, make_value(LANG_TYPE_BOOL, in_bounds),
+                     ok_label, error_label);
+
+    emit_label(context, error_label);
+    fprintf(context->out,
+            "  call void @zl_erro_execucao(i32 1, i32 %d) nounwind\n",
+            node->line);
+    fprintf(context->out, "  unreachable\n");
+    context->block_terminated = 1;
+
+    emit_label(context, ok_label);
+    storage_pointer(storage, base_pointer);
+    element_type = llvm_type(storage->type);
+    if (element_type == NULL) {
+        codegen_error(context, node,
+                      "elemento vetorial do tipo %s nao possui representacao LLVM",
+                      lang_type_name(storage->type));
+        return invalid_address();
+    }
+
+    new_temp(context, element_pointer);
+    fprintf(context->out,
+            "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
+            element_pointer, storage->vector_size, element_type,
+            base_pointer, index.operand);
+
+    return make_address(storage->type, element_pointer);
+}
+
+static LlvmAddress generate_field_address(CodegenContext *context,
+                                           const AstNode *node) {
+    const Storage *storage;
+    const AstNode *field;
+    size_t field_index = 0U;
+    size_t field_vector_size = 0U;
+    LangType field_type = LANG_TYPE_ERROR;
+    char base_pointer[LLVM_OPERAND_CAPACITY];
+    char field_pointer[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->child_count == 0U ||
+        node->children[0] == NULL)
+        return invalid_address();
+
+    storage = lookup_storage(context, node->lexeme);
+    if (storage == NULL || storage->type != LANG_TYPE_RECORD ||
+        storage->record_type_name == NULL) {
+        codegen_error(context, node,
+                      "'%s' nao possui armazenamento de registro LLVM",
+                      node->lexeme != NULL ? node->lexeme : "<sem-nome>");
+        return invalid_address();
+    }
+
+    field = node->children[0];
+    if (!record_field_info(context, storage->record_type_name,
+                           field->lexeme, &field_index, &field_type,
+                           &field_vector_size)) {
+        codegen_error(context, field,
+                      "campo '%s.%s' nao encontrado no layout LLVM",
+                      storage->name,
+                      field->lexeme != NULL ? field->lexeme : "<sem-nome>");
+        return invalid_address();
+    }
+
+    if (field_vector_size != 0U) {
+        codegen_error(context, field,
+                      "campo vetorial de registro ainda nao possui sintaxe de acesso na linguagem");
+        return invalid_address();
+    }
+
+    storage_pointer(storage, base_pointer);
+    new_temp(context, field_pointer);
+    fprintf(context->out,
+            "  %s = getelementptr %%struct.%s, ptr %s, i32 0, i32 %zu\n",
+            field_pointer, storage->record_type_name,
+            base_pointer, field_index);
+
+    return make_address(field_type, field_pointer);
+}
+
+static LlvmAddress generate_lvalue_address(CodegenContext *context,
+                                            const AstNode *node) {
+    const Storage *storage;
+    char pointer[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL) return invalid_address();
+
+    if (node->kind == AST_VECTOR_ACCESS)
+        return generate_vector_address(context, node);
+    if (node->kind == AST_FIELD_ACCESS)
+        return generate_field_address(context, node);
+
+    if (node->kind != AST_IDENTIFIER) {
+        codegen_error(context, node,
+                      "no %s nao e um lvalue LLVM",
+                      ast_node_kind_name(node->kind));
+        return invalid_address();
+    }
+
+    storage = lookup_storage(context, node->lexeme);
+    if (storage == NULL) {
+        codegen_error(context, node,
+                      "armazenamento LLVM de '%s' nao encontrado",
+                      node->lexeme != NULL ? node->lexeme : "<sem-nome>");
+        return invalid_address();
+    }
+
+    if (storage->is_vector || storage->type == LANG_TYPE_RECORD) {
+        codegen_error(context, node,
+                      "'%s' exige acesso a elemento/campo",
+                      storage->name);
+        return invalid_address();
+    }
+
+    storage_pointer(storage, pointer);
+    return make_address(storage->type, pointer);
+}
+
+static LlvmValue load_address(CodegenContext *context,
+                              const AstNode *node,
+                              LlvmAddress address) {
+    const char *type_name;
+    char temp[LLVM_OPERAND_CAPACITY];
+
+    if (!address.valid) return invalid_value();
+
+    type_name = llvm_type(address.type);
+    if (type_name == NULL) {
+        codegen_error(context, node,
+                      "tipo %s nao pode ser carregado como valor escalar",
+                      lang_type_name(address.type));
+        return invalid_value();
+    }
+
+    new_temp(context, temp);
+    fprintf(context->out, "  %s = load %s, ptr %s\n",
+            temp, type_name, address.pointer);
+    return make_value(address.type, temp);
+}
+
 static LlvmValue generate_identifier(CodegenContext *context,
                                      const AstNode *node) {
     const Storage *storage;
@@ -506,6 +871,13 @@ static LlvmValue generate_identifier(CodegenContext *context,
         codegen_error(context, node,
                       "armazenamento LLVM de '%s' nao foi encontrado",
                       node->lexeme != NULL ? node->lexeme : "<sem-nome>");
+        return invalid_value();
+    }
+
+    if (storage->is_vector || storage->type == LANG_TYPE_RECORD) {
+        codegen_error(context, node,
+                      "'%s' exige acesso a elemento/campo",
+                      storage->name);
         return invalid_value();
     }
 
@@ -893,6 +1265,14 @@ static LlvmValue generate_expression(CodegenContext *context,
         case AST_IDENTIFIER:
             return generate_identifier(context, node);
 
+        case AST_VECTOR_ACCESS:
+            return load_address(context, node,
+                                generate_vector_address(context, node));
+
+        case AST_FIELD_ACCESS:
+            return load_address(context, node,
+                                generate_field_address(context, node));
+
         case AST_BINARY_EXPR:
             return generate_binary(context, node);
 
@@ -924,32 +1304,75 @@ static LlvmValue generate_expression(CodegenContext *context,
 static int declare_global(CodegenContext *context, const AstNode *node) {
     LangType type;
     const char *type_name;
+    const char *record_type_name = NULL;
+    size_t vector_size = 0U;
+    size_t first_identifier;
     size_t i;
 
-    if (node->kind != AST_VAR_DECL || node->token_type == TOKEN_IDENTIFIER) {
-        codegen_error(context, node,
-                      "somente globais escalares de tipo primitivo sao suportadas neste checkpoint");
+    if (node == NULL ||
+        (node->kind != AST_VAR_DECL && node->kind != AST_VECTOR_DECL))
         return 0;
+
+    if (node->token_type == TOKEN_IDENTIFIER) {
+        type = LANG_TYPE_RECORD;
+        record_type_name = node->lexeme;
+        type_name = NULL;
+    } else {
+        type = lang_type_from_token(node->token_type);
+        type_name = llvm_type(type);
     }
 
-    type = lang_type_from_token(node->token_type);
-    type_name = llvm_type(type);
-    if (type_name == NULL || type == LANG_TYPE_VAZIO) {
-        codegen_error(context, node,
-                      "tipo global %s ainda nao suportado",
-                      lang_type_name(type));
-        return 0;
-    }
+    if (node->kind == AST_VECTOR_DECL)
+        vector_size = vector_size_from_declaration(node);
 
-    for (i = 0U; i < node->child_count; ++i) {
+    first_identifier = declaration_first_identifier(node);
+
+    for (i = first_identifier; i < node->child_count; ++i) {
         const AstNode *identifier = node->children[i];
+        Storage *storage;
+
         if (identifier == NULL || identifier->kind != AST_IDENTIFIER)
             continue;
 
         if (!add_storage(context, 1, identifier->lexeme, type, identifier))
             return 0;
-        fprintf(context->out, "@%s = global %s zeroinitializer\n",
-                identifier->lexeme, type_name);
+
+        storage = &context->globals[context->global_count - 1U];
+        storage->is_vector = node->kind == AST_VECTOR_DECL;
+        storage->vector_size = vector_size;
+        storage->record_type_name = record_type_name;
+
+        if (storage->is_vector) {
+            if (type_name == NULL) {
+                codegen_error(context, node,
+                              "vetor global possui tipo de elemento invalido");
+                return 0;
+            }
+            fprintf(context->out,
+                    "@%s = global [%zu x %s] zeroinitializer\n",
+                    identifier->lexeme, vector_size, type_name);
+        } else if (type == LANG_TYPE_RECORD) {
+            if (record_type_name == NULL ||
+                find_record_definition(context, record_type_name) == NULL) {
+                codegen_error(context, node,
+                              "tipo de registro global '%s' nao encontrado",
+                              record_type_name != NULL
+                                  ? record_type_name : "<sem-nome>");
+                return 0;
+            }
+            fprintf(context->out,
+                    "@%s = global %%struct.%s zeroinitializer\n",
+                    identifier->lexeme, record_type_name);
+        } else {
+            if (type_name == NULL || type == LANG_TYPE_VAZIO) {
+                codegen_error(context, node,
+                              "tipo global %s ainda nao suportado",
+                              lang_type_name(type));
+                return 0;
+            }
+            fprintf(context->out, "@%s = global %s zeroinitializer\n",
+                    identifier->lexeme, type_name);
+        }
     }
 
     return 1;
@@ -958,36 +1381,28 @@ static int declare_global(CodegenContext *context, const AstNode *node) {
 static int predeclare_locals(CodegenContext *context,
                              const AstNode *node) {
     size_t i;
-    size_t first_child = 0U;
 
     if (node == NULL || context->memory_error) return !context->memory_error;
 
-    if (node->kind == AST_VECTOR_DECL) {
-        codegen_error(context, node,
-                      "vetores entram no checkpoint de vetores/registros");
-        return 0;
-    }
-
-    if (node->kind == AST_VAR_DECL) {
+    if (node->kind == AST_VAR_DECL || node->kind == AST_VECTOR_DECL) {
         LangType type;
-        const char *type_name;
+        const char *type_name = NULL;
+        const char *record_type_name = NULL;
+        size_t vector_size = 0U;
+        size_t first_identifier = declaration_first_identifier(node);
 
         if (node->token_type == TOKEN_IDENTIFIER) {
-            codegen_error(context, node,
-                          "variavel local de registro entra no checkpoint de vetores/registros");
-            return 0;
+            type = LANG_TYPE_RECORD;
+            record_type_name = node->lexeme;
+        } else {
+            type = lang_type_from_token(node->token_type);
+            type_name = llvm_type(type);
         }
 
-        type = lang_type_from_token(node->token_type);
-        type_name = llvm_type(type);
-        if (type_name == NULL || type == LANG_TYPE_VAZIO) {
-            codegen_error(context, node,
-                          "tipo local %s ainda nao suportado",
-                          lang_type_name(type));
-            return 0;
-        }
+        if (node->kind == AST_VECTOR_DECL)
+            vector_size = vector_size_from_declaration(node);
 
-        for (i = first_child; i < node->child_count; ++i) {
+        for (i = first_identifier; i < node->child_count; ++i) {
             const AstNode *identifier = node->children[i];
             Storage *storage;
 
@@ -998,9 +1413,44 @@ static int predeclare_locals(CodegenContext *context,
                 return 0;
 
             storage = &context->locals[context->local_count - 1U];
-            fprintf(context->out,
-                    "  %%%s = alloca %s ; linha %d\n",
-                    storage->llvm_name, type_name, identifier->line);
+            storage->is_vector = node->kind == AST_VECTOR_DECL;
+            storage->vector_size = vector_size;
+            storage->record_type_name = record_type_name;
+
+            if (storage->is_vector) {
+                if (type_name == NULL) {
+                    codegen_error(context, node,
+                                  "vetor local possui tipo de elemento invalido");
+                    return 0;
+                }
+                fprintf(context->out,
+                        "  %%%s = alloca [%zu x %s] ; linha %d\n",
+                        storage->llvm_name, vector_size, type_name,
+                        identifier->line);
+            } else if (type == LANG_TYPE_RECORD) {
+                if (record_type_name == NULL ||
+                    find_record_definition(context, record_type_name) == NULL) {
+                    codegen_error(context, node,
+                                  "tipo de registro local '%s' nao encontrado",
+                                  record_type_name != NULL
+                                      ? record_type_name : "<sem-nome>");
+                    return 0;
+                }
+                fprintf(context->out,
+                        "  %%%s = alloca %%struct.%s ; linha %d\n",
+                        storage->llvm_name, record_type_name,
+                        identifier->line);
+            } else {
+                if (type_name == NULL || type == LANG_TYPE_VAZIO) {
+                    codegen_error(context, node,
+                                  "tipo local %s ainda nao suportado",
+                                  lang_type_name(type));
+                    return 0;
+                }
+                fprintf(context->out,
+                        "  %%%s = alloca %s ; linha %d\n",
+                        storage->llvm_name, type_name, identifier->line);
+            }
         }
         return 1;
     }
@@ -1016,7 +1466,9 @@ static int activate_declaration(CodegenContext *context,
                                 const AstNode *node) {
     size_t i;
 
-    if (node == NULL || node->kind != AST_VAR_DECL) return 1;
+    if (node == NULL ||
+        (node->kind != AST_VAR_DECL && node->kind != AST_VECTOR_DECL))
+        return 1;
 
     for (i = 0U; i < node->child_count; ++i) {
         const AstNode *identifier = node->children[i];
@@ -1052,36 +1504,29 @@ static void deactivate_scope(CodegenContext *context, size_t scope_depth) {
 static int generate_assignment(CodegenContext *context,
                                const AstNode *node) {
     const AstNode *target;
-    const Storage *storage;
-    const char *type_name;
-    char pointer[LLVM_OPERAND_CAPACITY];
+    LlvmAddress address;
     LlvmValue value;
+    const char *type_name;
 
-    if (node->child_count < 2U) return 0;
+    if (node == NULL || node->child_count < 2U) return 0;
     target = node->children[0];
 
-    if (target == NULL || target->kind != AST_IDENTIFIER) {
-        codegen_error(context, target != NULL ? target : node,
-                      "checkpoint 9 suporta atribuicao apenas a identificador escalar");
-        return 0;
-    }
-
-    storage = lookup_storage(context, target->lexeme);
-    if (storage == NULL) {
-        codegen_error(context, target,
-                      "armazenamento LLVM de '%s' nao encontrado",
-                      target->lexeme);
-        return 0;
-    }
+    address = generate_lvalue_address(context, target);
+    if (!address.valid) return 0;
 
     value = generate_expression(context, node->children[1]);
-    value = convert_value(context, node, value, storage->type);
+    value = convert_value(context, node, value, address.type);
     if (!value.valid) return 0;
 
-    type_name = llvm_type(storage->type);
-    storage_pointer(storage, pointer);
+    type_name = llvm_type(address.type);
+    if (type_name == NULL) {
+        codegen_error(context, target,
+                      "destino de atribuicao possui tipo LLVM nao escalar");
+        return 0;
+    }
+
     fprintf(context->out, "  store %s %s, ptr %s ; linha %d\n",
-            type_name, value.operand, pointer, node->line);
+            type_name, value.operand, address.pointer, node->line);
     return 1;
 }
 
@@ -1140,32 +1585,25 @@ static int generate_builtin_call(CodegenContext *context,
 
     if (node->lexeme != NULL && strcmp(node->lexeme, "entrada") == 0) {
         const AstNode *target;
-        const Storage *storage;
-        char pointer[LLVM_OPERAND_CAPACITY];
+        LlvmAddress address;
         char temp[LLVM_OPERAND_CAPACITY];
 
         if (node->child_count != 1U) return 0;
         target = node->children[0];
 
-        if (target == NULL || target->kind != AST_IDENTIFIER) {
-            codegen_error(context, node,
-                          "entrada no checkpoint 9 suporta apenas identificador inteira");
-            return 0;
-        }
-
-        storage = lookup_storage(context, target->lexeme);
-        if (storage == NULL || storage->type != LANG_TYPE_INTEIRA) {
+        address = generate_lvalue_address(context, target);
+        if (!address.valid) return 0;
+        if (address.type != LANG_TYPE_INTEIRA) {
             codegen_error(context, target,
-                          "entrada no checkpoint 9 requer destino inteira");
+                          "entrada atualmente requer destino inteira");
             return 0;
         }
 
         new_temp(context, temp);
         fprintf(context->out, "  %s = call i32 @zl_le_int()\n", temp);
-        storage_pointer(storage, pointer);
         fprintf(context->out,
                 "  store i32 %s, ptr %s ; linha %d\n",
-                temp, pointer, node->line);
+                temp, address.pointer, node->line);
         return 1;
     }
 
@@ -1420,6 +1858,7 @@ static int generate_statement(CodegenContext *context,
 
     switch (node->kind) {
         case AST_VAR_DECL:
+        case AST_VECTOR_DECL:
             return activate_declaration(context, node);
         case AST_ASSIGNMENT:
             return generate_assignment(context, node);
@@ -1435,10 +1874,6 @@ static int generate_statement(CodegenContext *context,
             return generate_for(context, node);
         case AST_BLOCK:
             return generate_block(context, node, 1);
-        case AST_VECTOR_DECL:
-            codegen_error(context, node,
-                          "vetor sera rebaixado no checkpoint de vetores/registros");
-            return 0;
         default:
             codegen_error(context, node,
                           "comando %s sera rebaixado em checkpoint posterior",
@@ -1630,6 +2065,7 @@ static int generate_program(CodegenContext *context,
 
     collect_strings(context, program);
     if (context->memory_error) return 0;
+    if (!emit_record_types(context, program)) return 0;
     emit_string_globals(context);
     emit_runtime_declarations(context);
 
@@ -1637,16 +2073,14 @@ static int generate_program(CodegenContext *context,
         const AstNode *node = program->children[i];
 
         if (node == NULL) continue;
-        if (node->kind == AST_VAR_DECL) {
+        if (node->kind == AST_VAR_DECL ||
+            node->kind == AST_VECTOR_DECL) {
             if (!declare_global(context, node)) return 0;
         } else if (node->kind == AST_PRINCIPAL) {
             principal = node;
-        } else if (node->kind == AST_RECORD ||
-                   node->kind == AST_VECTOR_DECL) {
-            codegen_error(context, node,
-                          "%s sera suportado no checkpoint de vetores/registros",
-                          ast_node_kind_name(node->kind));
-            return 0;
+        } else if (node->kind == AST_RECORD) {
+            /* Tipo nomeado ja foi emitido antes das variaveis globais. */
+            continue;
         }
     }
 
