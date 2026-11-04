@@ -1,0 +1,21 @@
+registro Pessoa @
+[
+    palavra nome;
+    inteira idade;
+    flut altura;
+]
+
+inteira principal() @
+[
+    Pessoa pessoa;
+
+    pessoa.nome receba "Ana";
+    pessoa.idade receba 30;
+    pessoa.altura receba 1.65;
+
+    saida(pessoa.nome);
+    saida(pessoa.idade);
+    saida(pessoa.altura);
+
+    respost pessoa.idade;
+]

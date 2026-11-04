@@ -1,0 +1,25 @@
+inteira principal() @
+[
+    inteira vet{4} valores;
+    palavra vet{2} nomes;
+    inteira i;
+    inteira soma;
+
+    nomes{0} receba "Ana";
+    nomes{1} receba "Bia";
+
+    repete ( i receba 0, i < 4, i receba i + 1 ) edai
+    [
+        valores{i} receba i * 2;
+    ]
+
+    soma receba 0;
+    repete ( i receba 0, i < 4, i receba i + 1 ) edai
+    [
+        soma receba soma + valores{i};
+    ]
+
+    saida(nomes{1});
+    saida(soma);
+    respost soma;
+]

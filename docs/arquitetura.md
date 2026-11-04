@@ -107,3 +107,12 @@ No Checkpoint 11, o contexto de geração mantém uma referência para a AST glo
 Cada função reinicia os contadores de temporários/rótulos e sua tabela local de armazenamentos, enquanto variáveis globais e literais permanecem compartilhados pelo módulo. Isso permite recursão sem compartilhar estado local entre funções.
 
 O runtime continua separado das funções da linguagem: apenas operações dependentes da plataforma, E/S, erros e helpers matemáticos `zl_*` pertencem a `runtime/`.
+
+
+## Agregados no back-end
+
+O Checkpoint 12 estende `Storage` com metadados de agregado: tamanho de vetor e nome do tipo de registro. O armazenamento continua representado por um único endereço LLVM; funções auxiliares transformam um lvalue em `LlvmAddress`.
+
+`AST_VECTOR_ACCESS` calcula o endereço do elemento após emitir bounds check. `AST_FIELD_ACCESS` resolve o índice do campo a partir da definição `AST_RECORD` e gera GEP sobre o tipo nomeado.
+
+A atribuição foi generalizada: primeiro o gerador obtém um endereço de lvalue (identificador, elemento vetorial ou campo), depois gera/converte o valor e emite `store`. O mesmo mecanismo é reutilizado por `entrada(...)` para destinos `inteira`.

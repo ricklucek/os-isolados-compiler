@@ -1,0 +1,18 @@
+registro Config @
+[
+    inteira valor;
+]
+
+inteira vet{3} valores;
+Config config;
+
+inteira principal() @
+[
+    valores{1} receba 9;
+    config.valor receba 4;
+
+    saida(valores{1});
+    saida(config.valor);
+
+    respost valores{1} + config.valor;
+]
