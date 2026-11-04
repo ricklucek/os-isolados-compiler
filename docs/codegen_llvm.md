@@ -204,3 +204,14 @@ Acesso a campo usa o índice estático do campo:
 O GEP apenas calcula o endereço; leitura e escrita continuam separadas em `load`/`store`.
 
 Campos vetoriais podem existir no layout do registro, mas a linguagem atual não possui sintaxe definida para indexar diretamente `registro.campo{indice}`; por isso esse acesso continua fora do escopo, coerente com a decisão do front-end.
+
+
+## Literais reais e LLVM 18
+
+Literais reais da Macaronica têm tipo inicial `flut`. Para não depender da representabilidade decimal exata exigida pelo parser de IR usado na toolchain LLVM 18, o codegen:
+
+1. converte o lexema para `float`/binary32;
+2. promove esse valor já arredondado para `double` apenas para serialização;
+3. emite o bitstring hexadecimal LLVM correspondente.
+
+Assim, valores como `0.5`, `1.65` e `2.5` chegam ao LLVM com exatamente o valor `float` definido pelo compilador.

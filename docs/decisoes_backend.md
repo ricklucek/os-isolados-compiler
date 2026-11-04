@@ -41,6 +41,8 @@ Conversões LLVM:
 
 Não há narrowing implícito.
 
+**Serialização de literais `flut`:** o gerador arredonda primeiro o literal para `binary32` e emite a representação hexadecimal exata aceita pelo LLVM 18. Isso evita depender de uma string decimal que pode não representar exatamente o mesmo `float` (casos como `1.65`).
+
 ## B04 — Divisão `/` e `//`
 
 - `//` aceita somente `inteira` e gera divisão inteira com sinal (`sdiv i32`);
