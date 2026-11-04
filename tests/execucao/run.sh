@@ -218,6 +218,19 @@ tr -d '\r' < tests/execucao/12_curto_circuito_chamada.esperado > "$EXPECTED"
 cmp -s "$OUT" "$EXPECTED" ||
     fail "lado direito do curto-circuito foi avaliado indevidamente"
 
+"$BIN" tests/execucao/14_forward_entre_funcoes.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou chamada entre funcoes com definicao posterior"
+"$LLVM_AS" "$IR" -o /dev/null ||
+    fail "llvm-as rejeitou forward call entre funcoes"
+grep -q 'call i32 @dobrar' "$IR" ||
+    fail "forward call para dobrar ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou forward call entre funcoes"
+"./$PROG" > "$OUT" || fail "forward call entre funcoes retornou erro"
+tr -d '\r' < tests/execucao/14_forward_entre_funcoes.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de forward call divergiu"
+
 "$BIN" tests/execucao/13_erro_expoente_negativo.mcn -o "$IR" >/dev/null ||
     fail "nao gerou caso de erro de expoente"
 "$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \

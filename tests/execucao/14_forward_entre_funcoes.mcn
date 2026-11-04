@@ -1,0 +1,18 @@
+outrafuncao inteira aplicar(inteira valor) @
+[
+    respost dobrar(valor);
+]
+
+outrafuncao inteira dobrar(inteira valor) @
+[
+    respost valor * 2;
+]
+
+inteira principal() @
+[
+    inteira resultado;
+
+    resultado receba aplicar(4);
+    saida(resultado);
+    respost 0;
+]
