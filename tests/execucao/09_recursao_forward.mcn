@@ -1,0 +1,20 @@
+inteira principal() @
+[
+    inteira resultado;
+
+    resultado receba fatorial(5);
+    saida(resultado);
+    respost 0;
+]
+
+outrafuncao inteira fatorial(inteira n) @
+[
+    cond ( n < 2 ) edai
+    [
+        respost 1;
+    ]
+    casocontrario edai
+    [
+        respost n * fatorial(n - 1);
+    ]
+]

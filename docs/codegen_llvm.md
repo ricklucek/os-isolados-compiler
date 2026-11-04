@@ -1,4 +1,4 @@
-# Geração LLVM IR — Checkpoints 9 e 10
+# Geração LLVM IR — Checkpoints 9 a 11
 
 ## Escopo
 
@@ -22,14 +22,17 @@ Suportado:
 - `durante`;
 - `repete`;
 - `E` e `OU` com curto-circuito;
-- escopos locais aninhados e sombreamento de variáveis escalares.
+- escopos locais aninhados e sombreamento de variáveis escalares;
+- funções de usuário e recursão;
+- parâmetros e chamadas com promoção numérica;
+- funções `vazio`;
+- `^`;
+- `raiz()`.
 
 Ainda não suportado pelo codegen:
 
-- funções de usuário e recursão;
 - vetores;
-- registros;
-- `^` e `raiz()`.
+- registros.
 
 Essas construções continuam válidas no front-end. Ao usar `-o`, o gerador informa que o lowering ainda não existe e a CLI remove a saída parcial.
 
@@ -81,7 +84,7 @@ lli-18 --entry-function=zl_principal programa.ll
 Para execução com a biblioteca de plataforma:
 
 ```bash
-clang-18 programa.ll runtime/zl_runtime_posix.c -Iruntime -o programa
+clang-18 programa.ll runtime/zl_runtime_posix.c -Iruntime -lm -o programa
 ./programa
 ```
 
@@ -143,3 +146,31 @@ make show-mem2reg FILE=tests/execucao/05_lacos.mcn
 ```
 
 O arquivo `.llvm-before.ll` contém `alloca/load/store`; `.llvm-after.ll` mostra a promoção e os `phi i32` inseridos pelo LLVM nos cabeçalhos dos laços. O `phi i1` de curto-circuito é diferente: ele é produzido diretamente pelo gerador porque representa o valor de uma expressão que converge de dois caminhos de controle.
+
+
+## Funções — Checkpoint 11
+
+As funções não são convertidas em helpers do runtime. Elas permanecem funções LLVM normais do módulo:
+
+```llvm
+define <retorno> @nome(<parametros>) nounwind
+```
+
+Cada parâmetro chega inicialmente como `%argN`, recebe `alloca` no `entry` e é copiado com `store`. Isso mantém a estratégia uniforme de geração e permite que `mem2reg` elimine as cópias posteriormente.
+
+Chamadas usam:
+
+```llvm
+%t = call i32 @funcao(i32 %valor) nounwind
+call void @funcao_vazio(i32 %valor) nounwind
+```
+
+O gerador consulta a AST global para recuperar a assinatura da função e converter argumentos para os tipos dos parâmetros. Como os nomes de funções são símbolos globais do módulo LLVM, chamadas recursivas e referências a funções definidas textualmente depois são válidas.
+
+## Matemática
+
+`^` e `raiz()` são traduzidos para helpers `zl_*`, e não diretamente para libc/libm. Isso mantém a IR independente da plataforma.
+
+Para `inteira ^ inteira`, o retorno continua `i32`. Expoentes negativos causam erro de execução. Para `flut` e `duplocarpado`, o helper preserva o tipo real resultante.
+
+`raiz(inteira)` promove o argumento para `flut`, seguindo a regra semântica já existente.

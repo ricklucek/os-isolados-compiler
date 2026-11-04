@@ -3,14 +3,12 @@
 /*
  * Primeiro back-end LLVM da Macaronica.
  *
- * O Checkpoint 10 acrescenta controle de fluxo ao subconjunto escalar:
- * - cond / casocontrario cond / casocontrario;
- * - durante;
- * - repete;
- * - E e OU com curto-circuito real em blocos basicos.
+ * O Checkpoint 11 acrescenta:
+ * - funcoes de usuario, parametros, chamadas, retorno e recursao;
+ * - funcoes vazio;
+ * - ^ e raiz() por helpers de runtime de assinatura fixa.
  *
- * Funcoes de usuario, vetores, registros, ^ e raiz() entram nos checkpoints
- * seguintes. Quando um programa valido usa uma
+ * Vetores e registros permanecem para o checkpoint seguinte. Quando um programa valido usa uma
  * construcao ainda nao rebaixada, o gerador falha de forma controlada e o
  * arquivo de saida e removido pelo chamador.
  */
@@ -47,6 +45,7 @@ typedef struct {
 typedef struct {
     FILE *out;
     FILE *err;
+    const AstNode *program;
     size_t error_count;
     int memory_error;
     size_t next_temp;
@@ -302,7 +301,12 @@ static void emit_runtime_declarations(CodegenContext *context) {
             "declare void @zl_imprime_texto(ptr) nounwind\n"
             "declare void @zl_imprime_nl() nounwind\n"
             "declare i32 @zl_le_int() nounwind\n"
-            "declare void @zl_erro_execucao(i32, i32) nounwind\n\n");
+            "declare void @zl_erro_execucao(i32, i32) nounwind\n"
+            "declare i32 @zl_pow_i32(i32, i32, i32) nounwind\n"
+            "declare float @zl_pow_flut(float, float) nounwind\n"
+            "declare double @zl_pow_duplo(double, double) nounwind\n"
+            "declare float @zl_raiz_flut(float, i32) nounwind\n"
+            "declare double @zl_raiz_duplo(double, i32) nounwind\n\n");
 }
 
 static void new_temp(CodegenContext *context,
@@ -353,6 +357,52 @@ static LlvmValue make_value(LangType type, const char *operand) {
     return value;
 }
 
+static const AstNode *find_callable(const CodegenContext *context,
+                                    const char *name) {
+    size_t i;
+
+    if (context == NULL || context->program == NULL || name == NULL)
+        return NULL;
+
+    for (i = 0U; i < context->program->child_count; ++i) {
+        const AstNode *node = context->program->children[i];
+        if (node == NULL ||
+            (node->kind != AST_FUNCTION && node->kind != AST_PRINCIPAL) ||
+            node->lexeme == NULL)
+            continue;
+
+        if (strcmp(node->lexeme, name) == 0)
+            return node;
+    }
+
+    return NULL;
+}
+
+static const AstNode *function_parameter_at(const AstNode *function,
+                                            size_t index) {
+    size_t i;
+    size_t current = 0U;
+
+    if (function == NULL) return NULL;
+
+    for (i = 0U; i < function->child_count; ++i) {
+        const AstNode *child = function->children[i];
+        if (child == NULL || child->kind != AST_PARAMETER)
+            continue;
+
+        if (current == index) return child;
+        ++current;
+    }
+
+    return NULL;
+}
+
+static const char *llvm_callable_name(const AstNode *function) {
+    if (function != NULL && function->kind == AST_PRINCIPAL)
+        return "zl_principal";
+    return function != NULL ? function->lexeme : NULL;
+}
+
 static LlvmValue convert_value(CodegenContext *context, const AstNode *node,
                                LlvmValue value, LangType target) {
     char temp[LLVM_OPERAND_CAPACITY];
@@ -390,6 +440,8 @@ static LlvmValue convert_value(CodegenContext *context, const AstNode *node,
 
 static LlvmValue generate_expression(CodegenContext *context,
                                      const AstNode *node);
+static LlvmValue generate_user_call(CodegenContext *context,
+                                    const AstNode *node);
 
 static LlvmValue generate_short_circuit(CodegenContext *context,
                                         const AstNode *node) {
@@ -534,15 +586,38 @@ static LlvmValue generate_binary(CodegenContext *context,
     if (node->token_type == TOKEN_E || node->token_type == TOKEN_OU)
         return generate_short_circuit(context, node);
 
-    if (node->token_type == TOKEN_CARET) {
-        codegen_error(context, node,
-                      "operador '^' sera rebaixado no checkpoint de funcoes/intrinsecos");
-        return invalid_value();
-    }
-
     left = generate_expression(context, node->children[0]);
     right = generate_expression(context, node->children[1]);
     if (!left.valid || !right.valid) return invalid_value();
+
+    if (node->token_type == TOKEN_CARET) {
+        operation_type = node->inferred_type;
+        left = convert_value(context, node, left, operation_type);
+        right = convert_value(context, node, right, operation_type);
+        if (!left.valid || !right.valid) return invalid_value();
+
+        new_temp(context, temp);
+        if (operation_type == LANG_TYPE_INTEIRA) {
+            fprintf(context->out,
+                    "  %s = call i32 @zl_pow_i32(i32 %s, i32 %s, i32 %d) nounwind\n",
+                    temp, left.operand, right.operand, node->line);
+        } else if (operation_type == LANG_TYPE_FLUT) {
+            fprintf(context->out,
+                    "  %s = call float @zl_pow_flut(float %s, float %s) nounwind\n",
+                    temp, left.operand, right.operand);
+        } else if (operation_type == LANG_TYPE_DUPLOCARPADO) {
+            fprintf(context->out,
+                    "  %s = call double @zl_pow_duplo(double %s, double %s) nounwind\n",
+                    temp, left.operand, right.operand);
+        } else {
+            codegen_error(context, node,
+                          "potencia nao suportada para tipo %s",
+                          lang_type_name(operation_type));
+            return invalid_value();
+        }
+
+        return make_value(operation_type, temp);
+    }
 
     if (node->token_type == TOKEN_XOR) {
         new_temp(context, temp);
@@ -656,6 +731,123 @@ static LlvmValue generate_binary(CodegenContext *context,
     return make_value(operation_type, temp);
 }
 
+static LlvmValue generate_root_expression(CodegenContext *context,
+                                               const AstNode *node) {
+    LlvmValue argument;
+    LangType result_type;
+    char temp[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->child_count == 0U)
+        return invalid_value();
+
+    argument = generate_expression(context, node->children[0]);
+    if (!argument.valid) return argument;
+
+    result_type = node->inferred_type;
+    argument = convert_value(context, node, argument, result_type);
+    if (!argument.valid) return invalid_value();
+
+    new_temp(context, temp);
+    if (result_type == LANG_TYPE_FLUT) {
+        fprintf(context->out,
+                "  %s = call float @zl_raiz_flut(float %s, i32 %d) nounwind\n",
+                temp, argument.operand, node->line);
+    } else if (result_type == LANG_TYPE_DUPLOCARPADO) {
+        fprintf(context->out,
+                "  %s = call double @zl_raiz_duplo(double %s, i32 %d) nounwind\n",
+                temp, argument.operand, node->line);
+    } else {
+        codegen_error(context, node,
+                      "raiz() nao suportada para tipo %s",
+                      lang_type_name(result_type));
+        return invalid_value();
+    }
+
+    return make_value(result_type, temp);
+}
+
+static LlvmValue generate_user_call(CodegenContext *context,
+                                    const AstNode *node) {
+    const AstNode *function;
+    const char *function_name;
+    LangType return_type;
+    LlvmValue *arguments = NULL;
+    size_t count;
+    size_t i;
+    char temp[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->lexeme == NULL)
+        return invalid_value();
+
+    function = find_callable(context, node->lexeme);
+    if (function == NULL) {
+        codegen_error(context, node,
+                      "assinatura LLVM da funcao '%s' nao foi encontrada",
+                      node->lexeme);
+        return invalid_value();
+    }
+
+    count = node->child_count;
+    if (count > 0U) {
+        arguments = calloc(count, sizeof(*arguments));
+        if (arguments == NULL) {
+            codegen_memory_error(context);
+            return invalid_value();
+        }
+    }
+
+    for (i = 0U; i < count; ++i) {
+        const AstNode *parameter = function_parameter_at(function, i);
+        LangType target_type;
+
+        if (parameter == NULL) {
+            free(arguments);
+            codegen_error(context, node,
+                          "assinatura de '%s' possui menos parametros que a chamada",
+                          node->lexeme);
+            return invalid_value();
+        }
+
+        target_type = lang_type_from_token(parameter->token_type);
+        arguments[i] = generate_expression(context, node->children[i]);
+        arguments[i] =
+            convert_value(context, node->children[i], arguments[i], target_type);
+
+        if (!arguments[i].valid) {
+            free(arguments);
+            return invalid_value();
+        }
+    }
+
+    function_name = llvm_callable_name(function);
+    return_type = lang_type_from_token(function->token_type);
+
+    if (return_type != LANG_TYPE_VAZIO) {
+        new_temp(context, temp);
+        fprintf(context->out, "  %s = call %s @%s(",
+                temp, llvm_type(return_type), function_name);
+    } else {
+        fprintf(context->out, "  call void @%s(", function_name);
+    }
+
+    for (i = 0U; i < count; ++i) {
+        const AstNode *parameter = function_parameter_at(function, i);
+        LangType parameter_type = lang_type_from_token(parameter->token_type);
+
+        if (i > 0U) fprintf(context->out, ", ");
+        fprintf(context->out, "%s %s",
+                llvm_type(parameter_type), arguments[i].operand);
+    }
+
+    fprintf(context->out, ") nounwind ; linha %d\n", node->line);
+    free(arguments);
+
+    if (return_type == LANG_TYPE_VAZIO)
+        return make_value(LANG_TYPE_VAZIO, "");
+
+    return make_value(return_type, temp);
+}
+
 static LlvmValue generate_expression(CodegenContext *context,
                                      const AstNode *node) {
     char literal[LLVM_OPERAND_CAPACITY];
@@ -708,15 +900,18 @@ static LlvmValue generate_expression(CodegenContext *context,
             return generate_unary(context, node);
 
         case AST_ROOT_EXPR:
-            codegen_error(context, node,
-                          "raiz() sera rebaixada com intrinseco/helper em checkpoint posterior");
-            return invalid_value();
+            return generate_root_expression(context, node);
 
         case AST_CALL:
-            codegen_error(context, node,
-                          "chamada '%s' nao pode ser usada como expressao neste checkpoint",
-                          node->lexeme != NULL ? node->lexeme : "<sem-nome>");
-            return invalid_value();
+            if (node->lexeme != NULL &&
+                (strcmp(node->lexeme, "entrada") == 0 ||
+                 strcmp(node->lexeme, "saida") == 0)) {
+                codegen_error(context, node,
+                              "builtin '%s' nao pode ser usado como expressao de valor",
+                              node->lexeme);
+                return invalid_value();
+            }
+            return generate_user_call(context, node);
 
         default:
             codegen_error(context, node,
@@ -974,10 +1169,8 @@ static int generate_builtin_call(CodegenContext *context,
         return 1;
     }
 
-    codegen_error(context, node,
-                  "chamada de funcao '%s' entra no checkpoint de funcoes",
-                  node->lexeme != NULL ? node->lexeme : "<sem-nome>");
-    return 0;
+    value = generate_user_call(context, node);
+    return value.valid;
 }
 
 static int generate_return(CodegenContext *context, const AstNode *node) {
@@ -1254,6 +1447,50 @@ static int generate_statement(CodegenContext *context,
     }
 }
 
+static size_t parameter_count(const AstNode *function);
+
+static int prepare_parameters(CodegenContext *context,
+                              const AstNode *function) {
+    size_t count = parameter_count(function);
+    size_t i;
+
+    for (i = 0U; i < count; ++i) {
+        const AstNode *parameter = function_parameter_at(function, i);
+        LangType type;
+        Storage *storage;
+
+        if (parameter == NULL) continue;
+        type = lang_type_from_token(parameter->token_type);
+
+        if (!add_storage(context, 0, parameter->lexeme, type, parameter))
+            return 0;
+
+        storage = &context->locals[context->local_count - 1U];
+        storage->active = 1;
+        storage->scope_depth = 0U;
+
+        fprintf(context->out,
+                "  %%%s = alloca %s ; parametro linha %d\n",
+                storage->llvm_name, llvm_type(type), parameter->line);
+        fprintf(context->out,
+                "  store %s %%arg%zu, ptr %%%s\n",
+                llvm_type(type), i, storage->llvm_name);
+    }
+
+    return 1;
+}
+
+static void reset_function_context(CodegenContext *context,
+                                   LangType return_type) {
+    context->local_count = 0U;
+    context->current_return_type = return_type;
+    context->block_terminated = 0;
+    context->next_temp = 0U;
+    context->next_label = 0U;
+    context->scope_depth = 0U;
+    snprintf(context->current_block, sizeof(context->current_block), "entry");
+}
+
 static const AstNode *function_body(const AstNode *function) {
     size_t i;
 
@@ -1276,6 +1513,60 @@ static size_t parameter_count(const AstNode *function) {
             ++count;
 
     return count;
+}
+
+static int generate_user_function(CodegenContext *context,
+                                  const AstNode *function) {
+    const AstNode *body;
+    LangType return_type;
+    const char *return_name;
+    size_t count;
+    size_t i;
+
+    if (function == NULL || function->kind != AST_FUNCTION)
+        return 0;
+
+    body = function_body(function);
+    if (body == NULL) {
+        codegen_error(context, function,
+                      "funcao '%s' nao possui bloco para geracao LLVM",
+                      function->lexeme != NULL ? function->lexeme : "<sem-nome>");
+        return 0;
+    }
+
+    return_type = lang_type_from_token(function->token_type);
+    return_name = llvm_type(return_type);
+    count = parameter_count(function);
+
+    fprintf(context->out, "define %s @%s(",
+            return_name, function->lexeme);
+    for (i = 0U; i < count; ++i) {
+        const AstNode *parameter = function_parameter_at(function, i);
+        LangType type = lang_type_from_token(parameter->token_type);
+        if (i > 0U) fprintf(context->out, ", ");
+        fprintf(context->out, "%s %%arg%zu", llvm_type(type), i);
+    }
+    fprintf(context->out, ") nounwind {\nentry:\n");
+
+    reset_function_context(context, return_type);
+    if (!prepare_parameters(context, function)) return 0;
+    if (!predeclare_locals(context, body)) return 0;
+    if (!generate_block(context, body, 0)) return 0;
+
+    if (!context->block_terminated) {
+        if (return_type == LANG_TYPE_VAZIO) {
+            fprintf(context->out, "  ret void\n");
+            context->block_terminated = 1;
+        } else {
+            codegen_error(context, function,
+                          "funcao '%s' terminou sem terminador LLVM",
+                          function->lexeme);
+            return 0;
+        }
+    }
+
+    fprintf(context->out, "}\n\n");
+    return 1;
 }
 
 static int generate_principal(CodegenContext *context,
@@ -1301,13 +1592,7 @@ static int generate_principal(CodegenContext *context,
         return 0;
     }
 
-    context->local_count = 0U;
-    context->current_return_type = LANG_TYPE_INTEIRA;
-    context->block_terminated = 0;
-    context->next_temp = 0U;
-    context->next_label = 0U;
-    context->scope_depth = 0U;
-    snprintf(context->current_block, sizeof(context->current_block), "entry");
+    reset_function_context(context, LANG_TYPE_INTEIRA);
 
     fprintf(context->out,
             "define i32 @zl_principal() nounwind {\n"
@@ -1337,6 +1622,8 @@ static int generate_program(CodegenContext *context,
         return 0;
     }
 
+    context->program = program;
+
     fprintf(context->out,
             "; LLVM IR gerado pelo compilador Macaronica\n"
             "; IR portavel: sem target triple e sem target datalayout\n\n");
@@ -1354,17 +1641,26 @@ static int generate_program(CodegenContext *context,
             if (!declare_global(context, node)) return 0;
         } else if (node->kind == AST_PRINCIPAL) {
             principal = node;
-        } else if (node->kind == AST_FUNCTION ||
-                   node->kind == AST_RECORD ||
+        } else if (node->kind == AST_RECORD ||
                    node->kind == AST_VECTOR_DECL) {
             codegen_error(context, node,
-                          "%s sera suportado em checkpoint posterior",
+                          "%s sera suportado no checkpoint de vetores/registros",
                           ast_node_kind_name(node->kind));
             return 0;
         }
     }
 
     if (context->global_count > 0U) fputc('\n', context->out);
+
+    /*
+     * Definicoes podem chamar funcoes declaradas mais adiante no texto:
+     * referencias globais nomeadas do LLVM sao resolvidas no modulo completo.
+     */
+    for (i = 0U; i < program->child_count; ++i) {
+        const AstNode *node = program->children[i];
+        if (node != NULL && node->kind == AST_FUNCTION)
+            if (!generate_user_function(context, node)) return 0;
+    }
 
     if (principal == NULL) {
         codegen_error(context, program,

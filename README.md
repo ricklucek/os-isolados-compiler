@@ -165,7 +165,7 @@ Depois de o programa passar por lexer, parser e semântico, a opção `-o` gera 
 ./macaronica programa.mcn -o programa.ll
 ```
 
-Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. Até o Checkpoint 10, o gerador cobre `principal` inteira sem parâmetros, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, operadores lógicos, `cond/casocontrario`, `durante`, `repete` e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Construções ainda não rebaixadas geram diagnóstico de codegen em vez de IR inválida.
+Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. Até o Checkpoint 11, o gerador cobre `principal`, funções de usuário, parâmetros, chamadas, recursão, funções `vazio`, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, operadores lógicos, `cond/casocontrario`, `durante`, `repete`, `^`, `raiz()` e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Vetores e registros permanecem para o próximo checkpoint.
 
 Validar um arquivo e a IR com LLVM:
 
@@ -186,6 +186,51 @@ make show-mem2reg FILE=tests/execucao/05_lacos.mcn
 ```
 
 O código gerado define `@zl_principal`; o `main` real fica no runtime da plataforma.
+
+## Funções, chamadas e recursão — Checkpoint 11
+
+Uma função Macaronica como:
+
+```text
+outrafuncao inteira quadrado(inteira n) @
+[
+    respost n * n;
+]
+```
+
+é emitida na forma:
+
+```llvm
+define i32 @quadrado(i32 %arg0) nounwind {
+entry:
+  %n.addr = alloca i32
+  store i32 %arg0, ptr %n.addr
+  ...
+  ret i32 %resultado
+}
+```
+
+Parâmetros usam a mesma estratégia em memória das variáveis locais para que `mem2reg` possa promover ambos. Chamadas fazem conversões numéricas explícitas conforme os tipos anotados pela análise semântica.
+
+Referências a funções definidas mais adiante no arquivo são permitidas. O teste `14_forward_entre_funcoes.mcn` cobre uma função que chama outra cuja definição textual aparece depois. Recursão é coberta por `09_recursao_forward.mcn`, com fatorial.
+
+Funções `vazio` geram `define void` e `ret void`. Se uma função `vazio` termina sem `respost;`, o gerador acrescenta o `ret void` final.
+
+## Potência e raiz
+
+O IR não chama `pow`, `sqrt` ou outras funções da libc/libm diretamente. Em vez disso, usa a ABI fixa do runtime:
+
+```text
+zl_pow_i32
+zl_pow_flut
+zl_pow_duplo
+zl_raiz_flut
+zl_raiz_duplo
+```
+
+No runtime POSIX, os casos reais usam `powf/pow/sqrtf/sqrt`; no futuro runtime AVR, essas mesmas assinaturas terão implementação adequada ao alvo.
+
+A potência inteira usa exponenciação por quadratura e multiplicação em `uint32_t`, preservando a política de overflow módulo 2^32. Expoente inteiro negativo gera `ZL_ERRO_EXPOENTE_NEGATIVO`. Raiz de valor negativo gera `ZL_ERRO_RAIZ_NEGATIVA`.
 
 ## Códigos de saída
 
@@ -320,8 +365,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 7 — roteiro de estudo, apresentação e defesa do código — concluído
 - Checkpoint 8 — AST anotada e contrato do back-end — concluído
 - Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído
-- Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído nesta entrega
-- Checkpoint 11 — LLVM: funções, chamadas, recursão e intrínsecos — próximo
+- Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído
+- Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído nesta entrega
+- Checkpoint 12 — LLVM: vetores, registros e verificações de execução — próximo
 
 
 ## Material de estudo e apresentação

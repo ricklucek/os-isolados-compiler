@@ -1,0 +1,11 @@
+outrafuncao vazio mostrar(inteira valor) @
+[
+    saida(valor);
+    respost;
+]
+
+inteira principal() @
+[
+    mostrar(7);
+    respost 0;
+]

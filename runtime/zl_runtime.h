@@ -20,10 +20,18 @@ int32_t zl_le_int(void);
 
 void zl_erro_execucao(int32_t codigo, int32_t linha);
 
+int32_t zl_pow_i32(int32_t base, int32_t expoente, int32_t linha);
+float zl_pow_flut(float base, float expoente);
+double zl_pow_duplo(double base, double expoente);
+float zl_raiz_flut(float valor, int32_t linha);
+double zl_raiz_duplo(double valor, int32_t linha);
+
 enum {
     ZL_ERRO_INDICE = 1,
     ZL_ERRO_DIV_ZERO = 2,
-    ZL_ERRO_ARITMETICO = 3
+    ZL_ERRO_ARITMETICO = 3,
+    ZL_ERRO_EXPOENTE_NEGATIVO = 4,
+    ZL_ERRO_RAIZ_NEGATIVA = 5
 };
 
 #endif

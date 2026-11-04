@@ -89,10 +89,16 @@ Os índices de `getelementptr` serão `i32`, conforme a regra de portabilidade a
 
 ## B09 — `^` e `raiz()`
 
-- `raiz()` será implementada com operação/intrínseco LLVM de raiz para o tipo real resultante;
-- `^` inteiro e real terão implementação de assinatura fixa, sem função variádica. O gerador poderá usar intrínseco LLVM quando aplicável ou função `zl_*` do runtime, desde que a semântica permaneça idêntica em todos os alvos.
+**Decisão fechada no Checkpoint 11:** as duas operações usam helpers de runtime de assinatura fixa.
 
-A escolha concreta da instrução/helper será fechada no checkpoint de expressões LLVM.
+- `inteira ^ inteira` -> `zl_pow_i32(base, expoente, linha)`;
+- `flut ^ flut` -> `zl_pow_flut`;
+- `duplocarpado ^ duplocarpado` -> `zl_pow_duplo`;
+- `raiz(...)` -> `zl_raiz_flut` ou `zl_raiz_duplo` conforme o tipo inferido.
+
+A IR não chama `pow`/`sqrt` da plataforma diretamente. No POSIX, o runtime implementa os helpers usando libm; no AVR, as mesmas assinaturas poderão usar a implementação disponível para o alvo.
+
+Potência inteira com expoente negativo gera `ZL_ERRO_EXPOENTE_NEGATIVO`. A multiplicação da potência inteira usa aritmética módulo 2^32, coerente com B07. Raiz de valor negativo gera `ZL_ERRO_RAIZ_NEGATIVA`.
 
 ## B10 — Entrada e saída
 
@@ -191,3 +197,20 @@ O lowering LLVM agora cobre `cond/casocontrario`, `durante` e `repete`, com bloc
 Variáveis escalares declaradas em blocos internos são pré-alocadas no `entry`, mas só ficam visíveis quando sua declaração é alcançada. O gerador mantém profundidade de escopo e nomes LLVM únicos para sombreamento, permitindo, por exemplo, `%x.addr` e `%x.1.addr`.
 
 O teste de laços também executa `opt -passes=mem2reg` e exige a presença de `phi i32`, servindo como evidência automatizada da transformação para SSA.
+
+
+## B17 — ABI de funções da Macaronica
+
+Funções de usuário são símbolos globais LLVM com o mesmo nome da linguagem e atributo `nounwind`. A exceção é `principal`, que continua mapeada para `@zl_principal`.
+
+Parâmetros são passados por valor na assinatura LLVM. Dentro da função, cada parâmetro recebe um `alloca` no `entry` e um `store` do `%argN`, seguindo a mesma estratégia das variáveis locais. `mem2reg` pode eliminar esse armazenamento depois.
+
+Chamadas aplicam as promoções já autorizadas pelo semântico antes do `call`. Não há narrowing implícito.
+
+Funções podem chamar funções definidas textualmente depois e podem ser recursivas. A resolução é feita no módulo LLVM pelo nome global.
+
+## Estado do Checkpoint 11
+
+O lowering cobre funções não-`vazio` e `vazio`, parâmetros, chamadas como expressão ou comando, recursão e forward calls. Os testes executáveis incluem quadrado/média, fatorial recursivo, função `vazio`, chamada entre funções em ordem textual inversa e curto-circuito cujo operando direito contém uma chamada com efeito observável.
+
+`^` e `raiz()` também estão fechados pelo contrato de runtime da decisão B09. Vetores e registros permanecem como os principais itens ainda não rebaixados do PjBL 3.
