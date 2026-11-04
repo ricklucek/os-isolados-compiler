@@ -1233,7 +1233,8 @@ static LlvmValue generate_expression(CodegenContext *context,
             return make_value(LANG_TYPE_INTEIRA,
                               node->lexeme != NULL ? node->lexeme : "0");
 
-        case AST_REAL_LITERAL:
+        case AST_REAL_LITERAL: {
+            float rounded;
             number = strtod(node->lexeme != NULL ? node->lexeme : "0",
                             &end);
             if (end == node->lexeme) {
@@ -1241,8 +1242,16 @@ static LlvmValue generate_expression(CodegenContext *context,
                               "literal real invalido para LLVM");
                 return invalid_value();
             }
-            snprintf(literal, sizeof(literal), "%.9e", number);
+
+            /*
+             * A forma hexadecimal C99 preserva exatamente o valor binary32.
+             * Isso evita literais decimais que o parser LLVM rejeita quando
+             * nao representam exatamente um float (por exemplo, 1.65).
+             */
+            rounded = (float)number;
+            snprintf(literal, sizeof(literal), "%a", (double)rounded);
             return make_value(LANG_TYPE_FLUT, literal);
+        }
 
         case AST_BOOL_LITERAL:
             return make_value(
