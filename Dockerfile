@@ -14,6 +14,7 @@ RUN apt-get update \
         avr-libc \
         binutils-avr \
         avrdude \
+        simavr \
         python3 \
         entr \
         gawk \

@@ -54,4 +54,30 @@ grep -q '@zl_espera' "$OUT/04_pisca_led.ll" ||
 grep -q '@zl_pino_le' "$OUT/pinole.ll" ||
     fail "builtin pinole nao chegou ao LLVM"
 
-echo "Arduino Uno: alvo, memoria, builtins e ELF/HEX OK."
+for file in     tests/placa/09_imprime_constante.mcn     tests/placa/10_laco_escalar.mcn; do
+    LLVM_AS="$LLVM_AS" LLVM_OPT="$LLVM_OPT" LLVM_LLC="$LLVM_LLC"     AVR_GCC="$AVR_GCC" AVR_OBJCOPY="$AVR_OBJCOPY" AVR_SIZE="$AVR_SIZE"         sh scripts/build_uno.sh "$file" "$OUT" "$BIN" >/dev/null ||
+        fail "build diagnostico AVR falhou para $file"
+done
+
+run_simavr() {
+    hex="$1"
+    output="$2"
+    status=0
+    timeout 2s simavr -m atmega328p -f 16000000 "$hex"         > "$output" 2>&1 || status=$?
+    [ "$status" -eq 0 ] || [ "$status" -eq 124 ] ||
+        fail "simavr falhou para $hex (exit $status)"
+}
+
+run_simavr "$OUT/09_imprime_constante.hex" "$OUT/constante.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/constante.sim" ||
+    fail "simavr: saida(15) nao produziu 15"
+
+run_simavr "$OUT/10_laco_escalar.hex" "$OUT/laco.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/laco.sim" ||
+    fail "simavr: laco escalar nao produziu 15"
+
+run_simavr "$OUT/01_laco_vetor.hex" "$OUT/vetor.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/vetor.sim" ||
+    fail "simavr: laco+vetor nao produziu 15"
+
+echo "Arduino Uno: alvo, memoria, builtins, ELF/HEX e simulacao serial OK."

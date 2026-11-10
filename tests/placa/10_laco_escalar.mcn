@@ -1,0 +1,14 @@
+inteira principal() @
+[
+    inteira i;
+    inteira soma;
+
+    soma receba 0;
+    repete ( i receba 0, i < 5, i receba i + 1 ) edai
+    [
+        soma receba soma + i + 1;
+    ]
+
+    saida(soma);
+    respost 0;
+]

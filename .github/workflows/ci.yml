@@ -16,7 +16,7 @@ jobs:
       - name: Install LLVM 18
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-18 clang-18 mlir-18-tools libomp-18-dev gcc-avr avr-libc binutils-avr avrdude
+          sudo apt-get install -y llvm-18 clang-18 mlir-18-tools libomp-18-dev gcc-avr avr-libc binutils-avr avrdude simavr
       - name: Build
         run: make clean && make
       - name: Full test suite
