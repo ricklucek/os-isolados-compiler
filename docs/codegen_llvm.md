@@ -215,3 +215,43 @@ Literais reais da Macaronica têm tipo inicial `flut`. Para não depender da rep
 3. emite o bitstring hexadecimal LLVM correspondente.
 
 Assim, valores como `0.5`, `1.65` e `2.5` chegam ao LLVM com exatamente o valor `float` definido pelo compilador.
+
+
+## Hardening de divisão e i32 — Checkpoint 13
+
+### Divisão por zero
+
+Para um divisor literal zero, a geração falha antes de produzir uma IR utilizável. Para divisor literal não zero, nenhum branch adicional é emitido.
+
+Quando o divisor é dinâmico, a IR contém um teste:
+
+```llvm
+%iszero = icmp eq i32 %divisor, 0
+br i1 %iszero, label %div.zero, label %div.nonzero
+
+div.zero:
+  call void @zl_erro_execucao(i32 2, i32 <linha>) nounwind
+  unreachable
+```
+
+A versão de ponto flutuante usa `fcmp oeq` contra zero.
+
+### `INT32_MIN // -1`
+
+Depois da guarda de zero, `//` pode precisar de uma segunda guarda:
+
+```llvm
+%ismin = icmp eq i32 %a, -2147483648
+%isnegone = icmp eq i32 %b, -1
+%overflow = and i1 %ismin, %isnegone
+```
+
+O caminho inválido chama `ZL_ERRO_DIV_OVERFLOW`.
+
+### Literais inteira
+
+Um literal positivo fora de `0..2147483647` não pode ser usado diretamente como `i32`. A única magnitude adicional aceita é `2147483648` quando aparece sob o unário `-`, formando `-2147483648`.
+
+## Auditoria portátil e AVR
+
+`scripts/audit_llvm_portability.sh` formaliza invariantes que antes eram apenas documentados. `make check-avr` passa a IR por `llc-18 -mtriple=avr -mcpu=atmega328p`, produzindo objeto AVR para um programa independente do runtime.

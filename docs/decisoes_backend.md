@@ -47,9 +47,11 @@ Não há narrowing implícito.
 
 - `//` aceita somente `inteira` e gera divisão inteira com sinal (`sdiv i32`);
 - `/` é divisão real: se não houver `duplocarpado`, operandos são promovidos para `float` e o resultado é `flut`; se houver `duplocarpado`, o resultado é `double`;
-- divisão por zero será verificada em tempo de execução e chamará `zl_erro_execucao(ZL_ERRO_DIV_ZERO, linha)`.
+- divisor constante zero é rejeitado antes da emissão da IR utilizável;
+- divisor constante não nulo não recebe check redundante;
+- divisor dinâmico recebe um branch de guarda e, se zero, chama `zl_erro_execucao(ZL_ERRO_DIV_ZERO, linha)` seguido de `unreachable`.
 
-A política vale também quando o denominador não é conhecido em compilação.
+A regra implementa a política de inserir verificação de execução somente quando o caso não pode ser provado estaticamente.
 
 ## B05 — Operadores lógicos
 
@@ -73,7 +75,9 @@ O valor de `respost` é o código de saída lógico do programa. O runtime de ca
 
 `inteira` usa aritmética de 32 bits módulo 2^32 para `+`, `-` e `*`. O LLVM será emitido sem as flags `nsw`/`nuw`.
 
-O caso especial `INT32_MIN // -1`, que não é representável em `i32` e é problemático para `sdiv`, deverá ser protegido pelo gerador e convertido em erro de execução, em vez de produzir comportamento dependente do back-end.
+O caso especial `INT32_MIN // -1`, que não é representável em `i32` e é comportamento indefinido para `sdiv`, é protegido antes da instrução. Quando não pode ser descartado estaticamente, a IR verifica a combinação e chama `zl_erro_execucao(ZL_ERRO_DIV_OVERFLOW, linha)`.
+
+Literais `inteira` também precisam caber em `i32`. O codegen aceita `-2147483648` por tratamento específico do unário, aceita positivos até `2147483647` e rejeita magnitudes maiores sem gerar arquivo LLVM utilizável.
 
 ## B08 — Limites de vetor
 
@@ -229,3 +233,25 @@ Acesso a elemento usa `getelementptr [N x T], ptr base, i32 0, i32 indice`. Tant
 O lowering LLVM cobre vetores e registros locais/globais, leitura e escrita de elementos/campos e bounds check dinâmico com `ZL_ERRO_INDICE`. Os testes exigem IR aceita por `llvm-as/opt`, saída correta no runtime POSIX, presença de `getelementptr` e erro de índice com linha do fonte.
 
 Com isso, as construções estruturais mínimas do PjBL 3 (variáveis, expressões, controle, funções, vetores, registros, texto e E/S) já possuem caminho de geração LLVM. O próximo checkpoint será de fechamento/hardening do PjBL 3, principalmente verificações de execução adicionais, bateria mínima exigida e preparação explícita de portabilidade.
+
+
+## B19 — Momento das verificações
+
+O backend usa a regra: **provar estaticamente quando possível; verificar em runtime quando necessário**.
+
+Exemplos:
+
+- vetor com índice literal fora da faixa: erro semântico já existente;
+- vetor com índice variável: bounds check em runtime;
+- divisão por literal zero: erro de codegen antes da execução;
+- divisão por literal não zero: sem guarda redundante;
+- divisão por variável: guarda de zero em runtime;
+- `INT32_MIN // -1`: guarda em runtime somente quando os operandos não permitem eliminar o caso estaticamente.
+
+Essa política reduz overhead e fornece evidência explícita na IR dos checks que realmente dependem de valores de execução.
+
+## Estado do Checkpoint 13
+
+O PjBL 3 fica fechado com uma bateria superior ao mínimo de oito programas executáveis. Há casos específicos para precedência/associatividade, condicionais aninhadas, `durante` e `repete`, recursão, vetor, registro, entrada/saída, tipos mistos, `^`, `raiz()` e diferença entre `/` e `//`.
+
+A CI também executa uma auditoria de portabilidade da IR e um smoke test do mesmo LLVM IR no backend AVR/ATmega328P. Isso não substitui a biblioteca `zl_runtime_avr.c` nem a execução física exigidas pelo PjBL 4 Parte D.

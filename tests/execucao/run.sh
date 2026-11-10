@@ -455,4 +455,18 @@ status=0
 [ ! -e "$UNSUPPORTED" ] ||
     fail "falha controlada de codegen deixou LLVM parcial"
 
+expected_count=$(find tests/execucao -maxdepth 1 -name '*.esperado' | wc -l)
+[ "$expected_count" -ge 8 ] ||
+    fail "PjBL 3 exige ao menos 8 programas executaveis com saida esperada"
+
+for source in tests/execucao/*.mcn; do
+    case "$source" in
+        *99_ainda_nao_suportado.mcn) ;;
+        *)
+            grep -Fq "$source" "$0" ||
+                fail "programa de execucao sem cobertura no runner: $source"
+            ;;
+    esac
+done
+
 echo "PjBL 3: IR valida, bateria obrigatoria e casos de borda aprovados."
