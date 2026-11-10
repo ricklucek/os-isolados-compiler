@@ -1380,9 +1380,9 @@ static LlvmValue generate_root_expression(CodegenContext *context,
 
 static int is_platform_builtin_name(const char *name) {
     return name != NULL &&
-           (strcmp(name, "pino_modo") == 0 ||
-            strcmp(name, "pino_escreve") == 0 ||
-            strcmp(name, "pino_le") == 0 ||
+           (strcmp(name, "pinomodo") == 0 ||
+            strcmp(name, "pinoescreve") == 0 ||
+            strcmp(name, "pinole") == 0 ||
             strcmp(name, "espera") == 0);
 }
 
@@ -1395,8 +1395,8 @@ static LlvmValue generate_platform_builtin(CodegenContext *context,
     if (node == NULL || node->lexeme == NULL)
         return invalid_value();
 
-    if (strcmp(node->lexeme, "pino_modo") == 0 ||
-        strcmp(node->lexeme, "pino_escreve") == 0) {
+    if (strcmp(node->lexeme, "pinomodo") == 0 ||
+        strcmp(node->lexeme, "pinoescreve") == 0) {
         if (node->child_count != 2U) return invalid_value();
 
         a = generate_expression(context, node->children[0]);
@@ -1408,12 +1408,14 @@ static LlvmValue generate_platform_builtin(CodegenContext *context,
         if (!a.valid || !b.valid) return invalid_value();
 
         fprintf(context->out,
-                "  call void @zl_%s(i32 %s, i32 %s) nounwind ; linha %d\n",
-                node->lexeme, a.operand, b.operand, node->line);
+                "  call void @%s(i32 %s, i32 %s) nounwind ; linha %d\n",
+                strcmp(node->lexeme, "pinomodo") == 0
+                    ? "zl_pino_modo" : "zl_pino_escreve",
+                a.operand, b.operand, node->line);
         return make_value(LANG_TYPE_VAZIO, "");
     }
 
-    if (strcmp(node->lexeme, "pino_le") == 0) {
+    if (strcmp(node->lexeme, "pinole") == 0) {
         if (node->child_count != 1U) return invalid_value();
 
         a = generate_expression(context, node->children[0]);

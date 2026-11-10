@@ -76,9 +76,9 @@ static int is_builtin_reserved_name(const char *name) {
     return name != NULL &&
            (strcmp(name, "entrada") == 0 ||
             strcmp(name, "saida") == 0 ||
-            strcmp(name, "pino_modo") == 0 ||
-            strcmp(name, "pino_escreve") == 0 ||
-            strcmp(name, "pino_le") == 0 ||
+            strcmp(name, "pinomodo") == 0 ||
+            strcmp(name, "pinoescreve") == 0 ||
+            strcmp(name, "pinole") == 0 ||
             strcmp(name, "espera") == 0);
 }
 
@@ -158,13 +158,13 @@ static void predeclare_builtins(SemanticContext *context) {
         LANG_TYPE_INTEIRA
     };
 
-    if (!declare_builtin_raw(context, "pino_modo", LANG_TYPE_VAZIO,
+    if (!declare_builtin_raw(context, "pinomodo", LANG_TYPE_VAZIO,
                              two_ints, 2U))
         return;
-    if (!declare_builtin_raw(context, "pino_escreve", LANG_TYPE_VAZIO,
+    if (!declare_builtin_raw(context, "pinoescreve", LANG_TYPE_VAZIO,
                              two_ints, 2U))
         return;
-    if (!declare_builtin_raw(context, "pino_le", LANG_TYPE_INTEIRA,
+    if (!declare_builtin_raw(context, "pinole", LANG_TYPE_INTEIRA,
                              one_int, 1U))
         return;
     (void)declare_builtin_raw(context, "espera", LANG_TYPE_VAZIO,

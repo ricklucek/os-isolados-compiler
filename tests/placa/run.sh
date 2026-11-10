@@ -43,9 +43,9 @@ for file in     tests/placa/01_laco_vetor.mcn     tests/placa/02_recursao.mcn   
 done
 
 grep -q '@zl_pino_modo' "$OUT/04_pisca_led.ll" ||
-    fail "builtin pino_modo nao chegou ao LLVM"
+    fail "builtin pinomodo nao chegou ao LLVM"
 grep -q '@zl_pino_escreve' "$OUT/04_pisca_led.ll" ||
-    fail "builtin pino_escreve nao chegou ao LLVM"
+    fail "builtin pinoescreve nao chegou ao LLVM"
 grep -q '@zl_espera' "$OUT/04_pisca_led.ll" ||
     fail "builtin espera nao chegou ao LLVM"
 
