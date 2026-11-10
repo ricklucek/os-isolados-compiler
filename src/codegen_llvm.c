@@ -924,15 +924,49 @@ static LlvmAddress generate_vector_address(CodegenContext *context,
     new_temp(context, element_pointer);
     if (context->target == CODEGEN_LLVM_TARGET_AVR) {
         char avr_index[LLVM_OPERAND_CAPACITY];
+        char byte_offset[LLVM_OPERAND_CAPACITY];
+        char base_integer[LLVM_OPERAND_CAPACITY];
+        char address_integer[LLVM_OPERAND_CAPACITY];
+        unsigned element_size;
 
+        switch (storage->type) {
+            case LANG_TYPE_BOOL: element_size = 1U; break;
+            case LANG_TYPE_INTEIRA: element_size = 4U; break;
+            case LANG_TYPE_FLUT: element_size = 4U; break;
+            case LANG_TYPE_PALAVRA: element_size = 2U; break;
+            default:
+                codegen_error(context, node,
+                              "tipo vetorial %s nao possui tamanho AVR definido",
+                              lang_type_name(storage->type));
+                return invalid_address();
+        }
+
+        /*
+         * O backend AVR do LLVM 18 apresentou lowering incorreto para GEP
+         * dinamico sobre arrays locais. Depois do bounds check, o indice cabe
+         * no vetor; calculamos o endereco de dados explicitamente em i16,
+         * largura natural do ponteiro SRAM do ATmega328P.
+         */
         new_temp(context, avr_index);
+        new_temp(context, byte_offset);
+        new_temp(context, base_integer);
+        new_temp(context, address_integer);
+
         fprintf(context->out,
-                "  %s = trunc i32 %s to i16 ; indice de endereco AVR\n",
+                "  %s = trunc i32 %s to i16 ; indice AVR verificado\n",
                 avr_index, index.operand);
         fprintf(context->out,
-                "  %s = getelementptr [%zu x %s], ptr %s, i16 0, i16 %s\n",
-                element_pointer, storage->vector_size, element_type,
-                base_pointer, avr_index);
+                "  %s = mul i16 %s, %u ; deslocamento em bytes AVR\n",
+                byte_offset, avr_index, element_size);
+        fprintf(context->out,
+                "  %s = ptrtoint ptr %s to i16\n",
+                base_integer, base_pointer);
+        fprintf(context->out,
+                "  %s = add i16 %s, %s\n",
+                address_integer, base_integer, byte_offset);
+        fprintf(context->out,
+                "  %s = inttoptr i16 %s to ptr\n",
+                element_pointer, address_integer);
     } else {
         fprintf(context->out,
                 "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
