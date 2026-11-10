@@ -179,7 +179,10 @@ def compile_binary(config, kernel_ll, harness, exe, evidence_dir):
             "-Rpass-analysis=loop-vectorize",
         ]
     elif config == "C2":
-        kernel_flags = ["-O0"]
+        # A vetorizacao e decidida explicitamente no MLIR; -O2 fica
+        # responsavel por canonicalizacao/seleção de instrucoes no LLVM,
+        # deixando C1 x C2 comparaveis no mesmo nivel de otimizacao final.
+        kernel_flags = ["-O2", "-march=native"]
     elif config == "C3":
         kernel_flags = ["-O2", "-march=native", "-fopenmp"]
         link_flags = ["-fopenmp"]
