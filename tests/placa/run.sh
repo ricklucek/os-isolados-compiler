@@ -49,4 +49,9 @@ grep -q '@zl_pino_escreve' "$OUT/04_pisca_led.ll" ||
 grep -q '@zl_espera' "$OUT/04_pisca_led.ll" ||
     fail "builtin espera nao chegou ao LLVM"
 
+"$BIN" tests/placa/08_pinole_compila.mcn --alvo=uno -o "$OUT/pinole.ll" >/dev/null ||
+    fail "pinole deveria compilar para Uno"
+grep -q '@zl_pino_le' "$OUT/pinole.ll" ||
+    fail "builtin pinole nao chegou ao LLVM"
+
 echo "Arduino Uno: alvo, memoria, builtins e ELF/HEX OK."
