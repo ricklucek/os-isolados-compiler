@@ -76,6 +76,23 @@ run_simavr "$OUT/10_laco_escalar.hex" "$OUT/laco.sim"
 grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/laco.sim" ||
     fail "simavr: laco escalar nao produziu 15"
 
+for file in     tests/placa/11_vetor_constante.mcn     tests/placa/12_vetor_leitura_dinamica.mcn     tests/placa/13_vetor_escrita_dinamica.mcn; do
+    LLVM_AS="$LLVM_AS" LLVM_OPT="$LLVM_OPT" LLVM_LLC="$LLVM_LLC"     AVR_GCC="$AVR_GCC" AVR_OBJCOPY="$AVR_OBJCOPY" AVR_SIZE="$AVR_SIZE"         sh scripts/build_uno.sh "$file" "$OUT" "$BIN" >/dev/null ||
+        fail "build diagnostico vetorial AVR falhou para $file"
+done
+
+run_simavr "$OUT/11_vetor_constante.hex" "$OUT/vetor_constante.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/vetor_constante.sim" ||
+    fail "simavr: vetor com indices constantes nao produziu 15"
+
+run_simavr "$OUT/12_vetor_leitura_dinamica.hex" "$OUT/vetor_leitura.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/vetor_leitura.sim" ||
+    fail "simavr: leitura vetorial dinamica nao produziu 15"
+
+run_simavr "$OUT/13_vetor_escrita_dinamica.hex" "$OUT/vetor_escrita.sim"
+grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/vetor_escrita.sim" ||
+    fail "simavr: escrita vetorial dinamica nao produziu 15"
+
 run_simavr "$OUT/01_laco_vetor.hex" "$OUT/vetor.sim"
 grep -Eq '(^|[^0-9])15([^0-9]|$)' "$OUT/vetor.sim" ||
     fail "simavr: laco+vetor nao produziu 15"
