@@ -1,0 +1,9 @@
+flut vet{@N@} a;
+flut vet{@N@} b;
+flut vet{@N@} c;
+
+inteira principal() @
+[
+    c receba a + b;
+    respost 0;
+]

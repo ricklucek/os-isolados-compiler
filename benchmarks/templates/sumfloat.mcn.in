@@ -1,0 +1,8 @@
+flut vet{@N@} a;
+flut soma;
+
+inteira principal() @
+[
+    soma receba somavet(a);
+    respost 0;
+]
