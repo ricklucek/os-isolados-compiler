@@ -353,6 +353,9 @@ cmp -s "$OUT" "$EXPECTED" || fail "saida de entrada/saida divergiu"
     fail "verify rejeitou / e //"
 grep -q 'sdiv i32' "$IR" || fail "IR nao contem sdiv para //"
 grep -q 'fdiv float' "$IR" || fail "IR nao contem fdiv para /"
+if grep -q 'div.zero' "$IR"; then
+    fail "divisor constante nao nulo recebeu bounds de divisao desnecessario"
+fi
 "$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
     "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
     fail "clang nao ligou / e //"
@@ -414,7 +417,7 @@ status=0
 "./$PROG" > "$OUT" 2> "$ERR" || status=$?
 [ "$status" -eq 106 ] ||
     fail "INT32_MIN // -1 esperava exit 106 e recebeu $status"
-grep -Fq 'codigo=6, linha=7' "$ERR" ||
+grep -Fq 'codigo=6, linha=8' "$ERR" ||
     fail "overflow de sdiv nao informou codigo/linha esperados"
 
 "$BIN" tests/execucao/27_int32_minimo.mcn -o "$IR" >/dev/null ||
