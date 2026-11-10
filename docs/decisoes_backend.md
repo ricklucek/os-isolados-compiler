@@ -255,3 +255,39 @@ Essa política reduz overhead e fornece evidência explícita na IR dos checks q
 O PjBL 3 fica fechado com uma bateria superior ao mínimo de oito programas executáveis. Há casos específicos para precedência/associatividade, condicionais aninhadas, `durante` e `repete`, recursão, vetor, registro, entrada/saída, tipos mistos, `^`, `raiz()` e diferença entre `/` e `//`.
 
 A CI também executa uma auditoria de portabilidade da IR e um smoke test do mesmo LLVM IR no backend AVR/ATmega328P. Isso não substitui a biblioteca `zl_runtime_avr.c` nem a execução física exigidas pelo PjBL 4 Parte D.
+
+
+## B20 — Alvo Arduino Uno
+
+O alvo `uno` fixa:
+- tripla LLVM: `avr`;
+- CPU: `atmega328p`;
+- clock: 16 MHz;
+- SRAM física: 2048 bytes;
+- flash de aplicação considerada: 32256 bytes, preservando a região do bootloader.
+
+### RAM
+
+O compilador reserva 256 bytes de margem para runtime, endereços de retorno e temporários. Portanto a soma estimada de dados globais e do frame local de cada função deve caber em 1792 bytes.
+
+A estimativa usa as larguras semânticas no AVR:
+- bool: 1 B;
+- inteira: 4 B;
+- flut: 4 B;
+- palavra/pointer: 2 B;
+- vetores: N × tamanho do elemento;
+- registros: soma conservadora dos campos.
+
+Como o backend coloca todas as declarações locais de uma função no `entry`, inclusive as de blocos aninhados, a soma estática acompanha a estratégia real do codegen.
+
+Recursão continua permitida. A checagem cobre um frame, não consegue provar profundidade dinâmica; por isso programas recursivos no Uno devem usar profundidade conhecida/pequena.
+
+### duplocarpado
+
+`duplocarpado` mantém o significado de 64 bits da Macaronica. Em vez de silenciosamente rebaixá-lo ao `double` de 32 bits do avr-gcc, `--alvo=uno` o rejeita semanticamente. Isso preserva a semântica entre alvos.
+
+### Pinos
+
+A sintaxe da Macaronica não admite underscore em identificadores. Por isso os nomes de linguagem são `pinomodo`, `pinoescreve`, `pinole` e `espera`. Internamente eles chamam a ABI `zl_pino_modo`, `zl_pino_escreve`, `zl_pino_le` e `zl_espera`.
+
+A numeração é a do Arduino: D0–D13 = 0–13 e A0–A5 = 14–19.

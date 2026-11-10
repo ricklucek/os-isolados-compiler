@@ -1,0 +1,1 @@
+# Artefatos Arduino Uno\n\nOs arquivos .elf/.hex finais validados fisicamente serao preservados aqui antes da entrega.\n
