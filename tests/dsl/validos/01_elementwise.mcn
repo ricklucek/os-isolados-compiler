@@ -1,0 +1,12 @@
+inteira principal() @
+[
+    inteira vet{4} a;
+    flut vet{4} b;
+    flut vet{4} c;
+
+    c receba a + b;
+    c receba c - b;
+    c receba a * b;
+
+    respost 0;
+]

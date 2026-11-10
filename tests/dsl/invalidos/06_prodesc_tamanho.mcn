@@ -1,0 +1,9 @@
+inteira principal() @
+[
+    inteira vet{3} a;
+    inteira vet{4} b;
+    inteira p;
+
+    p receba prodesc(a, b);
+    respost 0;
+]
