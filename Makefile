@@ -7,11 +7,13 @@ LLVM_OPT ?= opt-18
 LLVM_LLI ?= lli-18
 LLVM_LLC ?= llc-18
 CLANG_LLVM ?= clang-18
+MLIR_OPT ?= mlir-opt-18
+MLIR_TRANSLATE ?= mlir-translate-18
 
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -47,6 +49,19 @@ emit-llvm: $(TARGET)
 	@$(LLVM_OPT) -passes=verify "$(if $(OUT),$(OUT),programa.ll)" -disable-output
 	@echo "LLVM IR validada."
 
+emit-mlir: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make emit-mlir FILE=programa.mcn [OUT=kernels.mlir]"; exit 1; }
+	@./$(TARGET) "$(FILE)" --emit-mlir "$(if $(OUT),$(OUT),kernels.mlir)"
+	@$(MLIR_OPT) "$(if $(OUT),$(OUT),kernels.mlir)" -o /dev/null
+	@echo "MLIR textual validado."
+
+mlir-pipeline: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make mlir-pipeline FILE=programa.mcn [OUTDIR=build/mlir]"; exit 1; }
+	@mkdir -p "$(if $(OUTDIR),$(OUTDIR),build/mlir)"
+	@./$(TARGET) "$(FILE)" --emit-mlir "$(if $(OUTDIR),$(OUTDIR),build/mlir)/00_input.mlir" >/dev/null
+	@MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" \
+		sh scripts/pipeline.sh "$(if $(OUTDIR),$(OUTDIR),build/mlir)/00_input.mlir" "$(if $(OUTDIR),$(OUTDIR),build/mlir)"
+
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
@@ -81,7 +96,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -165,6 +180,11 @@ test-dsl: $(TARGET)
 	@echo "== PjBL 4 Parte A: DSL vetorial =="
 	@sh tests/dsl/run.sh ./$(TARGET)
 
+test-mlir: $(TARGET)
+	@echo "== PjBL 4 Parte B: MLIR e lowering =="
+	@MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" LLVM_AS="$(LLVM_AS)" \
+		sh tests/mlir/run.sh ./$(TARGET)
+
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
 	@sh tests/robustez/run.sh ./$(TARGET)
@@ -208,4 +228,5 @@ clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
 		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-test.err .llvm-invalid.ll \
 		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll .llvm-audit.ll \
-		.llvm-avr.ll .llvm-avr.bc .llvm-avr.o .dsl-test.out .dsl-test.ll macaronica-entrega.zip
+		.llvm-avr.ll .llvm-avr.bc .llvm-avr.o .dsl-test.out .dsl-test.ll \
+		.mlir-test.mlir .mlir-test.ll macaronica-entrega.zip

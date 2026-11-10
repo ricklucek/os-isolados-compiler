@@ -16,7 +16,7 @@ jobs:
       - name: Install LLVM 18
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-18 clang-18
+          sudo apt-get install -y llvm-18 clang-18 mlir-18-tools
       - name: Build
         run: make clean && make
       - name: Full test suite
@@ -30,6 +30,7 @@ jobs:
           make audit-llvm FILE=tests/execucao/17_agregados_globais.mcn
           make check-avr FILE=tests/execucao/02_variaveis_expressoes.mcn
           make test-dsl
+          make mlir-pipeline FILE=tests/dsl/validos/01_elementwise.mcn OUTDIR=.ci-mlir >/dev/null
       - name: Sanitizers
         run: make test-sanitize
       - name: Delivery package

@@ -249,3 +249,18 @@ No Checkpoint 14, programas DSL válidos chegam até AST anotada e análise sem�
 O backend LLVM do PjBL 3 **não** transforma essas operações em laços escalares. Ao encontrar uma operação vetorial de primeira classe com `-o`, retorna erro controlado de codegen e remove a saída parcial.
 
 No Checkpoint 15, os nós vetoriais serão extraídos como núcleos MLIR usando dialetos padrão e depois rebaixados até LLVM IR, mantendo o restante do programa no backend já existente.
+
+
+## 12. Parte B — estratégia de geração MLIR
+
+A implementação adota a estratégia híbrida prevista no trabalho.
+
+Cada atribuição vetorial gera uma função:
+
+```text
+@zl_mlir_kernel_<sequencia>_l<linha>
+```
+
+Operações elemento a elemento usam `affine.for`, `affine.load/store` e `arith`. Reduções e produto escalar usam `scf.for` com acumulador em `iter_args`.
+
+O programa escalar não é reescrito em MLIR. O objetivo do próximo passo de integração é converter os kernels até LLVM IR e uni-los ao módulo produzido por `codegen_llvm`.

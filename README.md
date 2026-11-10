@@ -48,7 +48,7 @@ O projeto é compilado normalmente com:
 
 ## Ferramentas da Parte 2
 
-A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. O PjBL 3 usa `llvm-as-18`, `opt-18`, `lli-18`, `llc-18` e `clang-18`. O Checkpoint 14 inicia o PjBL 4 pela DSL vetorial; o lowering MLIR entra no checkpoint seguinte.
+A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**. O PjBL 3 usa `llvm-as-18`, `opt-18`, `lli-18`, `llc-18` e `clang-18`. A Parte B do PjBL 4 usa `mlir-opt-18` e `mlir-translate-18` para validar e rebaixar os kernels da DSL.
 
 As decisões de geração, portabilidade e comportamento dependente do alvo ficam em `docs/decisoes_backend.md`.
 
@@ -376,6 +376,44 @@ A especificação formal fica em `docs/dsl.md`.
 
 Neste checkpoint a DSL é analisada até a semântica. Ela **não é expandida para laços LLVM**: `-o` em um programa que contém operação vetorial de primeira classe retorna erro controlado de codegen. O próximo checkpoint emitirá esses núcleos em MLIR e fará o lowering exigido pelo PjBL 4.
 
+## Geração MLIR — PjBL 4 Parte B
+
+A estratégia é híbrida: o programa escalar continua no backend LLVM do PjBL 3 e as operações da DSL são extraídas como funções MLIR independentes.
+
+Gerar kernels:
+
+```bash
+./macaronica tests/dsl/validos/01_elementwise.mcn --emit-mlir kernels.mlir
+```
+
+ou:
+
+```bash
+make emit-mlir FILE=tests/dsl/validos/01_elementwise.mcn OUT=kernels.mlir
+```
+
+Executar o pipeline completo:
+
+```bash
+make mlir-pipeline FILE=tests/dsl/validos/01_elementwise.mcn OUTDIR=build/mlir
+```
+
+Arquivos produzidos:
+
+```text
+00_input.mlir       kernels emitidos pelo compilador
+01_canonical.mlir   canonicalize + cse
+02_scf.mlir         affine rebaixado para SCF
+03_llvm.mlir        dialeto LLVM do MLIR
+04_kernel.ll        LLVM IR textual via mlir-translate
+```
+
+O pipeline está em `scripts/pipeline.sh` e cada etapa possui comentário explicando sua função.
+
+Atribuições elemento a elemento usam `affine.for`; `somavet`, `maxvet` e `prodesc` usam `scf.for` com `iter_args`. Os tipos de memória são `memref<NxT>`.
+
+Neste checkpoint os kernels já chegam até LLVM IR válido, mas ainda não são ligados automaticamente ao módulo LLVM escalar. Essa integração híbrida será construída sobre os símbolos `@zl_mlir_kernel_N_linha`.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -409,6 +447,7 @@ make test-semantic
 make test-backend-prep
 make test-llvm
 make test-dsl
+make test-mlir
 make test-robustness
 make test-delivery
 make test-levels
@@ -514,8 +553,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído
 - Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído
 - Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído
-- Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído nesta entrega
-- Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — próximo
+- Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído
+- Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — concluído nesta entrega
+- Checkpoint 16 — PjBL 4 Parte C: vetorização, paralelismo e benchmarks — próximo
 
 
 ## Material de estudo e apresentação
