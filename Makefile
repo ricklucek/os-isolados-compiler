@@ -97,13 +97,16 @@ bench-smoke: $(TARGET)
 		--configs C0,C1,C2,C3 \
 		--kernels elementwise,prodesc \
 		--inner 2 \
+		--fastmath-experiment \
 		--output .bench-smoke
 	@test -s .bench-smoke/raw.csv
 	@test -s .bench-smoke/summary.csv
 	@test -s .bench-smoke/graficos/runtime_elementwise_1024.svg
 	@grep -q 'vector<' .bench-smoke/elementwise/1024/C2/variant/01_vector.mlir
 	@grep -q 'affine.parallel' .bench-smoke/elementwise/1024/C3/variant/01_parallel.mlir
-	@echo "Benchmark smoke C0/C1/C2/C3: OK."
+	@! grep -q 'fadd fast' .bench-smoke/sumfloat/1024/C1/variant/kernel.ll
+	@grep -q 'fadd fast' .bench-smoke/sumfloat/1024/C1F/variant/kernel.ll
+	@echo "Benchmark smoke C0/C1/C2/C3 + fast-math: OK."
 
 test-bench: bench-smoke
 
