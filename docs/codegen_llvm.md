@@ -1,4 +1,4 @@
-# Geração LLVM IR — Checkpoints 9 a 11
+# Geração LLVM IR — Checkpoints 9 a 12
 
 ## Escopo
 
@@ -27,12 +27,11 @@ Suportado:
 - parâmetros e chamadas com promoção numérica;
 - funções `vazio`;
 - `^`;
-- `raiz()`.
-
-Ainda não suportado pelo codegen:
-
-- vetores;
-- registros.
+- `raiz()`;
+- vetores locais e globais;
+- registros locais e globais;
+- acesso a elementos/campos por `getelementptr`;
+- bounds check dinâmico de vetores com erro de execução.
 
 Essas construções continuam válidas no front-end. Ao usar `-o`, o gerador informa que o lowering ainda não existe e a CLI remove a saída parcial.
 
@@ -174,3 +173,45 @@ O gerador consulta a AST global para recuperar a assinatura da função e conver
 Para `inteira ^ inteira`, o retorno continua `i32`. Expoentes negativos causam erro de execução. Para `flut` e `duplocarpado`, o helper preserva o tipo real resultante.
 
 `raiz(inteira)` promove o argumento para `flut`, seguindo a regra semântica já existente.
+
+
+## Agregados — Checkpoint 12
+
+### Vetores
+
+Uma declaração `inteira vet{4} valores;` usa o tipo LLVM `[4 x i32]`. O endereço de `valores{i}` é calculado por:
+
+```llvm
+%ptr = getelementptr [4 x i32], ptr %valores.addr, i32 0, i32 %i
+```
+
+Os dois índices têm papéis diferentes: o primeiro atravessa o ponteiro para o array completo e o segundo seleciona o elemento. O gerador usa sempre `i32` para os índices do GEP.
+
+Antes do GEP, a IR emite comparações para `indice >= 0` e `indice < N`. O caminho inválido chama `zl_erro_execucao(ZL_ERRO_INDICE, linha)` e termina em `unreachable`.
+
+A checagem está presente inclusive quando o índice é uma expressão. Índices constantes fora da faixa continuam sendo rejeitados antes, no semântico.
+
+### Registros
+
+Cada `AST_RECORD` é emitido como `%struct.Nome = type { ... }`, preservando a ordem textual dos campos. Declarações com múltiplos nomes expandem para múltiplos campos na mesma ordem.
+
+Acesso a campo usa o índice estático do campo:
+
+```llvm
+%campo = getelementptr %struct.Pessoa, ptr %pessoa.addr, i32 0, i32 1
+```
+
+O GEP apenas calcula o endereço; leitura e escrita continuam separadas em `load`/`store`.
+
+Campos vetoriais podem existir no layout do registro, mas a linguagem atual não possui sintaxe definida para indexar diretamente `registro.campo{indice}`; por isso esse acesso continua fora do escopo, coerente com a decisão do front-end.
+
+
+## Literais reais e LLVM 18
+
+Literais reais da Macaronica têm tipo inicial `flut`. Para não depender da representabilidade decimal exata exigida pelo parser de IR usado na toolchain LLVM 18, o codegen:
+
+1. converte o lexema para `float`/binary32;
+2. promove esse valor já arredondado para `double` apenas para serialização;
+3. emite o bitstring hexadecimal LLVM correspondente.
+
+Assim, valores como `0.5`, `1.65` e `2.5` chegam ao LLVM com exatamente o valor `float` definido pelo compilador.

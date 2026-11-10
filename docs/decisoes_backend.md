@@ -41,6 +41,8 @@ Conversões LLVM:
 
 Não há narrowing implícito.
 
+**Serialização de literais `flut`:** o gerador arredonda primeiro o literal para `binary32` e emite a representação hexadecimal exata aceita pelo LLVM 18. Isso evita depender de uma string decimal que pode não representar exatamente o mesmo `float` (casos como `1.65`).
+
 ## B04 — Divisão `/` e `//`
 
 - `//` aceita somente `inteira` e gera divisão inteira com sinal (`sdiv i32`);
@@ -75,17 +77,15 @@ O caso especial `INT32_MIN // -1`, que não é representável em `i32` e é prob
 
 ## B08 — Limites de vetor
 
-O front-end já rejeita índices constantes fora da faixa.
-
-Para índices dinâmicos, o LLVM gerado verificará:
+O front-end rejeita índices constantes fora da faixa. Desde o Checkpoint 12, todo acesso vetorial rebaixado também verifica em runtime:
 
 ```text
 0 <= indice < tamanho
 ```
 
-antes do `getelementptr`. Em falha, chama `zl_erro_execucao(ZL_ERRO_INDICE, linha)`.
+antes do `getelementptr`. Em falha, chama `zl_erro_execucao(ZL_ERRO_INDICE, linha)` e termina o bloco com `unreachable`.
 
-Os índices de `getelementptr` serão `i32`, conforme a regra de portabilidade adotada.
+Os índices de `getelementptr` são `i32`, conforme a regra de portabilidade adotada. Assim, índices dinâmicos são protegidos e o diagnóstico preserva a linha do programa Macaronica.
 
 ## B09 — `^` e `raiz()`
 
@@ -152,9 +152,11 @@ Os bytes do lexema serão preservados; o runtime é responsável pela apresenta�
 
 ## B14 — Registros
 
-Cada `registro` vira um tipo LLVM nomeado na ordem declarada dos campos. O acesso `variavel.campo` será traduzido com `getelementptr` usando o índice inteiro do campo.
+Cada `registro` vira um tipo LLVM nomeado `%struct.Nome`, preservando a ordem declarada dos campos. O acesso `variavel.campo` é traduzido com `getelementptr` e índice estático do campo.
 
-Não serão calculados offsets ou padding manualmente; isso pertence ao data layout escolhido pelo LLVM na construção para o alvo.
+Não são calculados offsets ou padding manualmente; isso pertence ao data layout escolhido pelo LLVM na construção para o alvo. Registros podem ser locais ou globais.
+
+O layout pode conter campos vetoriais, mas o acesso indexado a esses campos permanece indisponível enquanto a linguagem não tiver uma sintaxe formal para `registro.campo{indice}`.
 
 ## B15 — Estratégia SSA
 
@@ -214,3 +216,16 @@ Funções podem chamar funções definidas textualmente depois e podem ser recur
 O lowering cobre funções não-`vazio` e `vazio`, parâmetros, chamadas como expressão ou comando, recursão e forward calls. Os testes executáveis incluem quadrado/média, fatorial recursivo, função `vazio`, chamada entre funções em ordem textual inversa e curto-circuito cujo operando direito contém uma chamada com efeito observável.
 
 `^` e `raiz()` também estão fechados pelo contrato de runtime da decisão B09. Vetores e registros permanecem como os principais itens ainda não rebaixados do PjBL 3.
+
+
+## B18 — Vetores no LLVM
+
+Vetores da Macaronica são arrays LLVM fixos `[N x T]`, não vetores SIMD `<N x T>`. Isso preserva a semântica de armazenamento indexável da linguagem e deixa a vetorização para as fases de otimização/MLIR.
+
+Acesso a elemento usa `getelementptr [N x T], ptr base, i32 0, i32 indice`. Tanto arrays locais quanto globais usam o mesmo padrão.
+
+## Estado do Checkpoint 12
+
+O lowering LLVM cobre vetores e registros locais/globais, leitura e escrita de elementos/campos e bounds check dinâmico com `ZL_ERRO_INDICE`. Os testes exigem IR aceita por `llvm-as/opt`, saída correta no runtime POSIX, presença de `getelementptr` e erro de índice com linha do fonte.
+
+Com isso, as construções estruturais mínimas do PjBL 3 (variáveis, expressões, controle, funções, vetores, registros, texto e E/S) já possuem caminho de geração LLVM. O próximo checkpoint será de fechamento/hardening do PjBL 3, principalmente verificações de execução adicionais, bateria mínima exigida e preparação explícita de portabilidade.

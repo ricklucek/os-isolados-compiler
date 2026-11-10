@@ -165,7 +165,7 @@ Depois de o programa passar por lexer, parser e semântico, a opção `-o` gera 
 ./macaronica programa.mcn -o programa.ll
 ```
 
-Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. Até o Checkpoint 11, o gerador cobre `principal`, funções de usuário, parâmetros, chamadas, recursão, funções `vazio`, variáveis escalares, atribuições, retornos, literais, promoções numéricas, comparações, operadores lógicos, `cond/casocontrario`, `durante`, `repete`, `^`, `raiz()` e os builtins básicos `entrada`/`saida` suportados pelo runtime POSIX. Vetores e registros permanecem para o próximo checkpoint.
+Se a entrada for inválida, nenhum arquivo `.ll` novo é produzido. Até o Checkpoint 12, o gerador cobre funções, controle de fluxo, expressões, E/S básica, vetores locais/globais, registros locais/globais e acesso a elementos/campos com `getelementptr`. Índices vetoriais são verificados em tempo de execução antes do acesso.
 
 Validar um arquivo e a IR com LLVM:
 
@@ -231,6 +231,55 @@ zl_raiz_duplo
 No runtime POSIX, os casos reais usam `powf/pow/sqrtf/sqrt`; no futuro runtime AVR, essas mesmas assinaturas terão implementação adequada ao alvo.
 
 A potência inteira usa exponenciação por quadratura e multiplicação em `uint32_t`, preservando a política de overflow módulo 2^32. Expoente inteiro negativo gera `ZL_ERRO_EXPOENTE_NEGATIVO`. Raiz de valor negativo gera `ZL_ERRO_RAIZ_NEGATIVA`.
+
+## Vetores e registros — Checkpoint 12
+
+Vetores são armazenados diretamente como arrays LLVM de tamanho fixo:
+
+```llvm
+%valores.addr = alloca [4 x i32]
+%elemento = getelementptr [4 x i32], ptr %valores.addr, i32 0, i32 %indice
+```
+
+Antes de cada acesso, o gerador verifica:
+
+```text
+0 <= indice < tamanho
+```
+
+Em falha, a IR chama:
+
+```llvm
+call void @zl_erro_execucao(i32 1, i32 <linha>) nounwind
+unreachable
+```
+
+O código `1` corresponde a `ZL_ERRO_INDICE`.
+
+Registros viram tipos LLVM nomeados. Por exemplo:
+
+```text
+registro Pessoa @
+[
+    palavra nome;
+    inteira idade;
+    flut altura;
+]
+```
+
+gera:
+
+```llvm
+%struct.Pessoa = type { ptr, i32, float }
+```
+
+e `pessoa.idade` usa:
+
+```llvm
+getelementptr %struct.Pessoa, ptr %pessoa.addr, i32 0, i32 1
+```
+
+Nenhum offset é calculado manualmente. Isso mantém a IR independente do `target datalayout` e é importante para o futuro Arduino Uno.
 
 ## Códigos de saída
 
@@ -366,8 +415,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 8 — AST anotada e contrato do back-end — concluído
 - Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído
 - Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído
-- Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído nesta entrega
-- Checkpoint 12 — LLVM: vetores, registros e verificações de execução — próximo
+- Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído
+- Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído nesta entrega
+- Checkpoint 13 — fechamento do PjBL 3: erros de execução, bateria mínima e portabilidade — próximo
 
 
 ## Material de estudo e apresentação

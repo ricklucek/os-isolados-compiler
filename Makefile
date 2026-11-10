@@ -186,5 +186,5 @@ docker-sanitize:
 
 clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
-		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-invalid.ll \
+		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-test.err .llvm-invalid.ll \
 		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll macaronica-entrega.zip
