@@ -16,7 +16,7 @@ jobs:
       - name: Install LLVM 18
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-18 clang-18 mlir-18-tools libomp-18-dev
+          sudo apt-get install -y llvm-18 clang-18 mlir-18-tools libomp-18-dev gcc-avr avr-libc binutils-avr avrdude
       - name: Build
         run: make clean && make
       - name: Full test suite
@@ -34,6 +34,7 @@ jobs:
           make test-hybrid
           make bench-info >/dev/null
           make bench-smoke
+          make test-uno
       - name: Sanitizers
         run: make test-sanitize
       - name: Delivery package

@@ -26,6 +26,17 @@ double zl_pow_duplo(double base, double expoente);
 float zl_raiz_flut(float valor, int32_t linha);
 double zl_raiz_duplo(double valor, int32_t linha);
 
+void zl_pino_modo(int32_t pino, int32_t modo);
+void zl_pino_escreve(int32_t pino, int32_t valor);
+int32_t zl_pino_le(int32_t pino);
+void zl_espera(int32_t milissegundos);
+
+enum {
+    ZL_PINO_ENTRADA = 0,
+    ZL_PINO_SAIDA = 1,
+    ZL_PINO_ENTRADA_PULLUP = 2
+};
+
 enum {
     ZL_ERRO_INDICE = 1,
     ZL_ERRO_DIV_ZERO = 2,

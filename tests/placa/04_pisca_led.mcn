@@ -1,0 +1,16 @@
+inteira principal() @
+[
+    inteira i;
+
+    pino_modo(13, 1);
+
+    repete ( i receba 0, i < 6, i receba i + 1 ) edai
+    [
+        pino_escreve(13, 1);
+        espera(250);
+        pino_escreve(13, 0);
+        espera(250);
+    ]
+
+    respost 0;
+]

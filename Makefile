@@ -10,11 +10,15 @@ LLVM_LINK ?= llvm-link-18
 CLANG_LLVM ?= clang-18
 MLIR_OPT ?= mlir-opt-18
 MLIR_TRANSLATE ?= mlir-translate-18
+AVR_GCC ?= avr-gcc
+AVR_OBJCOPY ?= avr-objcopy
+AVR_SIZE ?= avr-size
+AVRDUDE ?= avrdude
 
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run bench-info bench bench-smoke test-bench run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run bench-info bench bench-smoke test-bench placa grava test-uno run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -110,6 +114,25 @@ bench-smoke: $(TARGET)
 
 test-bench: bench-smoke
 
+PROG ?=
+PLACA_DIR ?= placa
+
+placa: $(TARGET)
+	@test -n "$(PROG)" || { echo "Uso: make placa PROG=tests/placa/programa.mcn"; exit 1; }
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LLC="$(LLVM_LLC)" \
+		AVR_GCC="$(AVR_GCC)" AVR_OBJCOPY="$(AVR_OBJCOPY)" AVR_SIZE="$(AVR_SIZE)" \
+		sh scripts/build_uno.sh "$(PROG)" "$(PLACA_DIR)" ./$(TARGET)
+
+grava:
+	@test -n "$(HEX)" || { echo "Uso Linux/WSL: make grava HEX=placa/programa.hex PORT=/dev/ttyACM0"; exit 1; }
+	@test -n "$(PORT)" || { echo "Informe PORT=/dev/ttyACM0 (ou equivalente)."; exit 1; }
+	@$(AVRDUDE) -c arduino -p m328p -P "$(PORT)" -b 115200 -U flash:w:"$(HEX)":i
+
+test-uno: $(TARGET)
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LLC="$(LLVM_LLC)" \
+		AVR_GCC="$(AVR_GCC)" AVR_OBJCOPY="$(AVR_OBJCOPY)" AVR_SIZE="$(AVR_SIZE)" \
+		sh tests/placa/run.sh ./$(TARGET)
+
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
@@ -144,7 +167,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-bench test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-bench test-uno test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
