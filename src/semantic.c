@@ -72,9 +72,14 @@ static int enter_scope(SemanticContext *context, const char *name) {
     return 1;
 }
 
-static int is_builtin_io_name(const char *name) {
+static int is_builtin_reserved_name(const char *name) {
     return name != NULL &&
-           (strcmp(name, "entrada") == 0 || strcmp(name, "saida") == 0);
+           (strcmp(name, "entrada") == 0 ||
+            strcmp(name, "saida") == 0 ||
+            strcmp(name, "pino_modo") == 0 ||
+            strcmp(name, "pino_escreve") == 0 ||
+            strcmp(name, "pino_le") == 0 ||
+            strcmp(name, "espera") == 0);
 }
 
 static int declare_symbol(SemanticContext *context, const AstNode *node,
@@ -91,9 +96,9 @@ static int declare_symbol(SemanticContext *context, const AstNode *node,
         return 0;
     }
 
-    if (is_builtin_io_name(name)) {
+    if (is_builtin_reserved_name(name)) {
         semantic_error(context, node,
-                       "'%s' e reservado para a operacao embutida de entrada/saida",
+                       "'%s' e reservado para uma funcao embutida da linguagem",
                        name);
         return 0;
     }
@@ -121,6 +126,49 @@ static int declare_symbol(SemanticContext *context, const AstNode *node,
                        "'%s' possui declaracao duplicada neste escopo", name);
     }
     return 0;
+}
+
+static int declare_builtin_raw(SemanticContext *context,
+                               const char *name,
+                               LangType return_type,
+                               const LangType *parameter_types,
+                               size_t parameter_count) {
+    SymbolDeclareStatus status;
+
+    status = symbol_table_declare(
+        &context->symbols, name, SYMBOL_FUNCTION, return_type,
+        0U, parameter_types, parameter_count, NULL, 0, 0, NULL);
+
+    if (status == SYMBOL_DECLARE_OK) return 1;
+    if (status == SYMBOL_DECLARE_MEMORY_ERROR) {
+        semantic_memory_error(context);
+        return 0;
+    }
+
+    semantic_error(context, NULL,
+                   "falha ao registrar builtin '%s'", name);
+    return 0;
+}
+
+static void predeclare_builtins(SemanticContext *context) {
+    const LangType two_ints[] = {
+        LANG_TYPE_INTEIRA, LANG_TYPE_INTEIRA
+    };
+    const LangType one_int[] = {
+        LANG_TYPE_INTEIRA
+    };
+
+    if (!declare_builtin_raw(context, "pino_modo", LANG_TYPE_VAZIO,
+                             two_ints, 2U))
+        return;
+    if (!declare_builtin_raw(context, "pino_escreve", LANG_TYPE_VAZIO,
+                             two_ints, 2U))
+        return;
+    if (!declare_builtin_raw(context, "pino_le", LANG_TYPE_INTEIRA,
+                             one_int, 1U))
+        return;
+    (void)declare_builtin_raw(context, "espera", LANG_TYPE_VAZIO,
+                              one_int, 1U);
 }
 
 static size_t function_parameter_count(const AstNode *function) {
@@ -1306,6 +1354,7 @@ SemanticResult semantic_analyze(const AstNode *ast, FILE *error_stream) {
         return result;
     }
 
+    predeclare_builtins(&context);
     analyze_program(&context, ast);
 
     result.error_count = context.error_count;
