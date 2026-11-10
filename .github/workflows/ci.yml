@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
 
+concurrency:
+  group: c99-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
