@@ -287,8 +287,11 @@ int main(int argc, char *argv[]) {
             return COMPILER_EXIT_CODEGEN_INTERNAL;
         }
 
-        codegen_result =
-            codegen_llvm_generate(ast, llvm_output, stderr);
+        codegen_result = codegen_llvm_generate_target(
+            ast, llvm_output, stderr,
+            target == SEMANTIC_TARGET_UNO
+                ? CODEGEN_LLVM_TARGET_AVR
+                : CODEGEN_LLVM_TARGET_PORTABLE);
         close_failed = fclose(llvm_output) != 0;
 
         if (codegen_result.status != CODEGEN_LLVM_OK || close_failed) {

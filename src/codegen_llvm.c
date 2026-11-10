@@ -62,6 +62,7 @@ typedef struct {
     FILE *out;
     FILE *err;
     const AstNode *program;
+    CodegenLlvmTarget target;
     size_t error_count;
     int memory_error;
     size_t next_temp;
@@ -921,10 +922,23 @@ static LlvmAddress generate_vector_address(CodegenContext *context,
     }
 
     new_temp(context, element_pointer);
-    fprintf(context->out,
-            "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
-            element_pointer, storage->vector_size, element_type,
-            base_pointer, index.operand);
+    if (context->target == CODEGEN_LLVM_TARGET_AVR) {
+        char avr_index[LLVM_OPERAND_CAPACITY];
+
+        new_temp(context, avr_index);
+        fprintf(context->out,
+                "  %s = trunc i32 %s to i16 ; indice de endereco AVR\n",
+                avr_index, index.operand);
+        fprintf(context->out,
+                "  %s = getelementptr [%zu x %s], ptr %s, i16 0, i16 %s\n",
+                element_pointer, storage->vector_size, element_type,
+                base_pointer, avr_index);
+    } else {
+        fprintf(context->out,
+                "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
+                element_pointer, storage->vector_size, element_type,
+                base_pointer, index.operand);
+    }
 
     return make_address(storage->type, element_pointer);
 }
@@ -2788,15 +2802,17 @@ static int generate_program(CodegenContext *context,
     return generate_principal(context, principal);
 }
 
-CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
-                                        FILE *output,
-                                        FILE *error_stream) {
+CodegenLlvmResult codegen_llvm_generate_target(const AstNode *ast,
+                                               FILE *output,
+                                               FILE *error_stream,
+                                               CodegenLlvmTarget target) {
     CodegenContext context;
     CodegenLlvmResult result;
 
     memset(&context, 0, sizeof(context));
     context.out = output;
     context.err = error_stream != NULL ? error_stream : stderr;
+    context.target = target;
 
     if (output == NULL) {
         result.status = CODEGEN_LLVM_HAS_ERRORS;
@@ -2820,4 +2836,11 @@ CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
     free(context.globals);
     free(context.strings);
     return result;
+}
+
+CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
+                                        FILE *output,
+                                        FILE *error_stream) {
+    return codegen_llvm_generate_target(
+        ast, output, error_stream, CODEGEN_LLVM_TARGET_PORTABLE);
 }
