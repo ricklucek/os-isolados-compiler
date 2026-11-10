@@ -91,3 +91,15 @@ Os vetores da Macaronica são contíguos e de tamanho estático, então a ponte 
 Depois executa `llvm-as`, `opt -passes=verify` e produz um executável POSIX com `clang-18`.
 
 Isso fecha a estratégia híbrida aceita pelo enunciado. A Parte C pode agora medir kernels reais sem manter duas implementações funcionais separadas.
+
+
+## Evidência funcional da integração
+
+`tests/hybrid/` contém quatro programas que inicializam dados em Macaronica, executam um kernel MLIR ligado ao módulo escalar e observam o resultado novamente pela linguagem:
+
+- soma elemento a elemento com promoção `inteira -> flut`;
+- escalar variável × vetor;
+- `somavet`;
+- `prodesc` com promoção mista.
+
+A suíte exige que o módulo escalar contenha a chamada, o módulo MLIR contenha a definição, `llvm-link` resolva o símbolo e o executável final produza a saída esperada.

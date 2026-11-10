@@ -465,6 +465,32 @@ Para construir e executar:
 make hybrid-run FILE=tests/hybrid/01_elementwise_exec.mcn
 ```
 
+## Preparação da Parte C — metodologia experimental
+
+O Checkpoint 16 não publica tempos de CI como resultado científico. A CI serve apenas para correção funcional; a medição final deve ser executada em uma máquina fixa e documentada.
+
+Capturar o ambiente:
+
+```bash
+make bench-info
+```
+
+O comando registra sistema operacional, CPU, número de CPUs lógicas, arquitetura, flags SIMD visíveis e versões de LLVM/MLIR/Clang.
+
+A Parte C usará pelo menos dois núcleos:
+
+1. elemento a elemento;
+2. redução ou produto escalar.
+
+Para cada núcleo e tamanho, serão comparadas:
+
+- C0 — baseline sem otimização/vetorização;
+- C1 — LLVM `-O2`/autovetorização;
+- C2 — vetorização explícita no MLIR;
+- C3 — paralelismo MLIR/OpenMP.
+
+Cada configuração terá no mínimo 5 execuções. Tempo de compilação e tempo de execução serão armazenados separadamente, e o valor reportado será a mediana. Os detalhes estão em `docs/benchmarks.md`.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -500,6 +526,7 @@ make test-llvm
 make test-dsl
 make test-mlir
 make test-hybrid
+make bench-info
 make test-robustness
 make test-delivery
 make test-levels

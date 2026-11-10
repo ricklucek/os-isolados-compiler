@@ -14,7 +14,7 @@ MLIR_TRANSLATE ?= mlir-translate-18
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run bench-info run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -71,6 +71,9 @@ hybrid-build: $(TARGET)
 
 hybrid-run: hybrid-build
 	@"$(if $(OUTDIR),$(OUTDIR),build/hybrid)/programa"
+
+bench-info:
+	@sh scripts/system_info.sh
 
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
