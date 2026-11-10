@@ -395,8 +395,8 @@ static int emit_elementwise_kernel(MlirContext *context,
             "  // kernel %zu: atribuicao vetorial da linha %d\n",
             kernel_id, assignment->line);
     fprintf(context->out,
-            "  func.func @zl_mlir_kernel_%zu_l%d(",
-            kernel_id, assignment->line);
+            "  func.func @zl_mlir_kernel_l%d_c%d(",
+            assignment->line, assignment->column);
     print_kernel_args(context, target, 1);
     fprintf(context->out, ") {\n");
     fprintf(context->out,
@@ -455,8 +455,8 @@ static int emit_sum_kernel(MlirContext *context,
             "  // kernel %zu: somavet da linha %d\n",
             kernel_id, assignment->line);
     fprintf(context->out,
-            "  func.func @zl_mlir_kernel_%zu_l%d(",
-            kernel_id, assignment->line);
+            "  func.func @zl_mlir_kernel_l%d_c%d(",
+            assignment->line, assignment->column);
     print_kernel_args(context, NULL, 0);
     fprintf(context->out, ") -> %s {\n", mlir_type(result_type));
     fprintf(context->out,
@@ -518,8 +518,8 @@ static int emit_max_kernel(MlirContext *context,
             "  // kernel %zu: maxvet da linha %d\n",
             kernel_id, assignment->line);
     fprintf(context->out,
-            "  func.func @zl_mlir_kernel_%zu_l%d(",
-            kernel_id, assignment->line);
+            "  func.func @zl_mlir_kernel_l%d_c%d(",
+            assignment->line, assignment->column);
     print_kernel_args(context, NULL, 0);
     fprintf(context->out, ") -> %s {\n", mlir_type(result_type));
     fprintf(context->out,
@@ -591,8 +591,8 @@ static int emit_dot_kernel(MlirContext *context,
             "  // kernel %zu: prodesc da linha %d\n",
             kernel_id, assignment->line);
     fprintf(context->out,
-            "  func.func @zl_mlir_kernel_%zu_l%d(",
-            kernel_id, assignment->line);
+            "  func.func @zl_mlir_kernel_l%d_c%d(",
+            assignment->line, assignment->column);
     print_kernel_args(context, NULL, 0);
     fprintf(context->out, ") -> %s {\n", mlir_type(result_type));
     fprintf(context->out,
