@@ -1,0 +1,18 @@
+inteira principal() @
+[
+    inteira vet{4} a;
+    flut vet{4} b;
+    flut fator;
+
+    a{0} receba 1;
+    a{1} receba 2;
+    a{2} receba 3;
+    a{3} receba 4;
+    fator receba 2.5;
+
+    b receba fator * a;
+
+    saida(b{1});
+    saida(b{3});
+    respost 0;
+]

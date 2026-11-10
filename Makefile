@@ -6,6 +6,7 @@ LLVM_AS ?= llvm-as-18
 LLVM_OPT ?= opt-18
 LLVM_LLI ?= lli-18
 LLVM_LLC ?= llc-18
+LLVM_LINK ?= llvm-link-18
 CLANG_LLVM ?= clang-18
 MLIR_OPT ?= mlir-opt-18
 MLIR_TRANSLATE ?= mlir-translate-18
@@ -13,7 +14,7 @@ MLIR_TRANSLATE ?= mlir-translate-18
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -62,6 +63,15 @@ mlir-pipeline: $(TARGET)
 	@MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" \
 		sh scripts/pipeline.sh "$(if $(OUTDIR),$(OUTDIR),build/mlir)/00_input.mlir" "$(if $(OUTDIR),$(OUTDIR),build/mlir)"
 
+hybrid-build: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make hybrid-build FILE=programa.mcn [OUTDIR=build/hybrid]"; exit 1; }
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LINK="$(LLVM_LINK)" \
+		MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" CLANG_LLVM="$(CLANG_LLVM)" \
+		sh scripts/hybrid_pipeline.sh "$(FILE)" "$(if $(OUTDIR),$(OUTDIR),build/hybrid)" ./$(TARGET)
+
+hybrid-run: hybrid-build
+	@"$(if $(OUTDIR),$(OUTDIR),build/hybrid)/programa"
+
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
@@ -96,7 +106,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -184,6 +194,12 @@ test-mlir: $(TARGET)
 	@echo "== PjBL 4 Parte B: MLIR e lowering =="
 	@MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" LLVM_AS="$(LLVM_AS)" \
 		sh tests/mlir/run.sh ./$(TARGET)
+
+test-hybrid: $(TARGET)
+	@echo "== PjBL 4: integracao hibrida LLVM + MLIR =="
+	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LINK="$(LLVM_LINK)" \
+		MLIR_OPT="$(MLIR_OPT)" MLIR_TRANSLATE="$(MLIR_TRANSLATE)" CLANG_LLVM="$(CLANG_LLVM)" \
+		sh tests/hybrid/run.sh ./$(TARGET)
 
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="

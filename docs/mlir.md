@@ -60,3 +60,34 @@ Isso fornece diretamente os três níveis de evidência pedidos no enunciado e u
 ## Limite deste checkpoint
 
 O LLVM IR dos kernels usa a ABI de memref produzida pelo MLIR. Ainda não existe chamada automática do módulo escalar para esses símbolos. O próximo passo de integração deve gerar/adaptar a ponte e usar `llvm-link`, mantendo a separação híbrida.
+
+
+## Integração híbrida — Checkpoint 16
+
+A limitação anterior foi removida. O backend LLVM emite uma declaração e uma chamada para cada atribuição DSL, enquanto o backend MLIR emite a definição com o mesmo símbolo estável `zl_mlir_kernel_l<linha>_c<coluna>`.
+
+### ABI de memref
+
+No lowering padrão do MLIR 18, um `memref<NxT>` estático vira cinco argumentos LLVM:
+
+```text
+ptr allocated
+ptr aligned
+i64 offset
+i64 size
+i64 stride
+```
+
+Os vetores da Macaronica são contíguos e de tamanho estático, então a ponte usa `base, base, 0, N, 1`.
+
+### Link
+
+`scripts/hybrid_pipeline.sh` gera os dois módulos e usa `llvm-link-18`:
+
+```text
+00_scalar.ll + kernels/04_kernel.ll -> 05_linked.ll
+```
+
+Depois executa `llvm-as`, `opt -passes=verify` e produz um executável POSIX com `clang-18`.
+
+Isso fecha a estratégia híbrida aceita pelo enunciado. A Parte C pode agora medir kernels reais sem manter duas implementações funcionais separadas.
