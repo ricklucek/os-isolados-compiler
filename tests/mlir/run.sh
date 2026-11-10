@@ -27,6 +27,13 @@ for file in tests/dsl/validos/*.mcn; do
         fail "nao gerou MLIR para $file"
     "$MLIR_OPT" "$INPUT" -o /dev/null ||
         fail "mlir-opt rejeitou $file"
+
+    rm -rf "$WORK"
+    mkdir -p "$WORK"
+    MLIR_OPT="$MLIR_OPT" MLIR_TRANSLATE="$MLIR_TRANSLATE"         sh scripts/pipeline.sh "$INPUT" "$WORK" >/dev/null ||
+        fail "pipeline completo falhou para $file"
+    "$LLVM_AS" "$WORK/04_kernel.ll" -o /dev/null ||
+        fail "LLVM IR final de $file nao passa no llvm-as"
 done
 
 "$BIN" tests/dsl/validos/01_elementwise.mcn --emit-mlir "$INPUT" >/dev/null ||
