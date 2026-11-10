@@ -1943,8 +1943,35 @@ static int emit_memref_call_args(CodegenContext *context,
     return 1;
 }
 
+static LlvmValue *prepare_kernel_scalar_args(
+    CodegenContext *context, const KernelArgList *args) {
+    LlvmValue *values;
+    size_t i;
+
+    values = calloc(args->count == 0U ? 1U : args->count,
+                    sizeof(*values));
+    if (values == NULL) {
+        codegen_memory_error(context);
+        return NULL;
+    }
+
+    for (i = 0U; i < args->count; ++i) {
+        const AstNode *arg = args->items[i];
+        if (arg->inferred_is_vector) continue;
+
+        values[i] = generate_identifier(context, arg);
+        if (!values[i].valid) {
+            free(values);
+            return NULL;
+        }
+    }
+
+    return values;
+}
+
 static int emit_kernel_call_args(CodegenContext *context,
                                  const KernelArgList *args,
+                                 const LlvmValue *scalar_values,
                                  int *need_comma) {
     size_t i;
 
@@ -1955,9 +1982,9 @@ static int emit_kernel_call_args(CodegenContext *context,
             if (!emit_memref_call_args(context, arg, need_comma))
                 return 0;
         } else {
-            LlvmValue value = generate_identifier(context, arg);
-            if (!value.valid) return 0;
+            const LlvmValue value = scalar_values[i];
 
+            if (!value.valid) return 0;
             if (*need_comma) fprintf(context->out, ", ");
             fprintf(context->out, "%s %s",
                     llvm_type(value.type), value.operand);
@@ -1973,16 +2000,25 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
     const AstNode *target = node->children[0];
     const AstNode *expression = node->children[1];
     KernelArgList args;
+    LlvmValue *scalar_values = NULL;
     char name[LLVM_OPERAND_CAPACITY];
     int need_comma = 0;
 
     memset(&args, 0, sizeof(args));
     if (!collect_kernel_args(context, &args, expression)) {
+        free(scalar_values);
         kernel_arg_list_free(&args);
         return 0;
     }
 
     mlir_kernel_name(node, name);
+
+    scalar_values = prepare_kernel_scalar_args(context, &args);
+    if (scalar_values == NULL) {
+        free(scalar_values);
+        kernel_arg_list_free(&args);
+        return 0;
+    }
 
     if (expression->kind == AST_VECTOR_REDUCTION) {
         LlvmAddress address;
@@ -1992,6 +2028,7 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
 
         address = generate_lvalue_address(context, target);
         if (!address.valid) {
+            free(scalar_values);
             kernel_arg_list_free(&args);
             return 0;
         }
@@ -2001,7 +2038,8 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
         fprintf(context->out, "  %s = call %s @%s(",
                 temp, result_type, name);
 
-        if (!emit_kernel_call_args(context, &args, &need_comma)) {
+        if (!emit_kernel_call_args(context, &args, scalar_values, &need_comma)) {
+            free(scalar_values);
             kernel_arg_list_free(&args);
             return 0;
         }
@@ -2012,6 +2050,7 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
         value = make_value(expression->inferred_type, temp);
         value = convert_value(context, expression, value, address.type);
         if (!value.valid) {
+            free(scalar_values);
             kernel_arg_list_free(&args);
             return 0;
         }
@@ -2028,12 +2067,14 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
             codegen_error(context, target,
                           "destino vetorial '%s' nao possui storage LLVM",
                           target->lexeme != NULL ? target->lexeme : "<sem-nome>");
+            free(scalar_values);
             kernel_arg_list_free(&args);
             return 0;
         }
 
         fprintf(context->out, "  call void @%s(", name);
-        if (!emit_kernel_call_args(context, &args, &need_comma)) {
+        if (!emit_kernel_call_args(context, &args, scalar_values, &need_comma)) {
+            free(scalar_values);
             kernel_arg_list_free(&args);
             return 0;
         }
@@ -2048,6 +2089,7 @@ static int generate_mlir_kernel_assignment(CodegenContext *context,
                 node->line);
     }
 
+    free(scalar_values);
     kernel_arg_list_free(&args);
     return 1;
 }
