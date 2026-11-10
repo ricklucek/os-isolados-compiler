@@ -291,3 +291,12 @@ Recursão continua permitida. A checagem cobre um frame, não consegue provar pr
 A sintaxe da Macaronica não admite underscore em identificadores. Por isso os nomes de linguagem são `pinomodo`, `pinoescreve`, `pinole` e `espera`. Internamente eles chamam a ABI `zl_pino_modo`, `zl_pino_escreve`, `zl_pino_le` e `zl_espera`.
 
 A numeração é a do Arduino: D0–D13 = 0–13 e A0–A5 = 14–19.
+
+
+## B21 — Acesso vetorial dinâmico no LLVM AVR 18
+
+Na validação física do Arduino Uno foi observado que GEP dinâmico sobre vetor local, embora válido e correto no PC, produzia endereçamento incorreto quando rebaixado pelo backend AVR do LLVM 18. O comportamento foi reproduzido no `simavr`: índices constantes funcionavam, mas leitura dinâmica não.
+
+Para `--alvo=uno`, o compilador mantém bounds check em `i32` e chama `zl_vetor_endereco(ptr, i32, i32)` após a validação. O helper calcula o endereço SRAM com tipos nativos do avr-gcc. O caminho PC continua usando GEP.
+
+Essa exceção é dependente do alvo e está coberta por testes em emulador e placa real.

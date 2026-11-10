@@ -197,3 +197,27 @@ Após validar fisicamente os quatro programas, os `.hex`/ `.elf` escolhidos deve
 - `duplocarpado` é rejeitado;
 - profundidade de recursão não é provada estaticamente;
 - textos do usuário ainda não recebem a otimização opcional de armazenamento em flash/PROGMEM.
+
+
+## Compatibilidade LLVM AVR 18: índice vetorial dinâmico
+
+Durante a validação física, `01_laco_vetor.mcn` produziu `0` na serial do Uno, embora o mesmo programa produzisse `15` no PC. A gravação, UART e laços escalares estavam corretos.
+
+O problema foi reproduzido automaticamente com `simavr` e isolado com três casos:
+
+- `saida(15)`: correto;
+- laço escalar: correto;
+- vetor com índices constantes: correto;
+- vetor local com índice dinâmico: incorreto no lowering AVR do LLVM 18.
+
+Tentativas de usar GEP dinâmico com índice `i32` e depois `i16` mantiveram a falha. A solução adotada é específica do alvo Uno: o bounds check continua sendo gerado em LLVM IR, mas o cálculo do endereço SRAM dinâmico é delegado a:
+
+```text
+zl_vetor_endereco(base, indice, tamanho_elemento)
+```
+
+implementado em `zl_runtime_avr.c` e compilado por `avr-gcc`.
+
+No PC e nos demais caminhos portáveis, vetores continuam usando `getelementptr` normalmente. Assim, o workaround não altera a IR usada como evidência do PjBL 3 e fica explicitamente confinado à biblioteca/runtime do alvo AVR.
+
+A suíte `test-uno` agora usa `simavr` para impedir regressões desse caso antes da gravação física.
