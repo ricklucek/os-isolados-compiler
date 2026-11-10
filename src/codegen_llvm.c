@@ -144,25 +144,76 @@ static int parse_integer_literal_magnitude(const AstNode *node,
     return 1;
 }
 
-static int expression_is_known_zero(const AstNode *node) {
+static int expression_constant_number(const AstNode *node,
+                                      double *out_value) {
     char *end = NULL;
     double value;
+    double sign = 1.0;
 
     if (node == NULL) return 0;
 
-    if (node->kind == AST_INTEGER_LITERAL)
-        return node->lexeme != NULL && strcmp(node->lexeme, "0") == 0;
-
-    if (node->kind == AST_REAL_LITERAL && node->lexeme != NULL) {
-        value = strtod(node->lexeme, &end);
-        return end != node->lexeme && *end == '\0' && value == 0.0;
+    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
+        (node->token_type == TOKEN_PLUS || node->token_type == TOKEN_MINUS)) {
+        if (!expression_constant_number(node->children[0], &value))
+            return 0;
+        if (node->token_type == TOKEN_MINUS) sign = -1.0;
+        if (out_value != NULL) *out_value = sign * value;
+        return 1;
     }
 
-    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
-        (node->token_type == TOKEN_PLUS || node->token_type == TOKEN_MINUS))
-        return expression_is_known_zero(node->children[0]);
+    if ((node->kind != AST_INTEGER_LITERAL &&
+         node->kind != AST_REAL_LITERAL) ||
+        node->lexeme == NULL)
+        return 0;
 
-    return 0;
+    value = strtod(node->lexeme, &end);
+    if (end == node->lexeme || *end != '\0') return 0;
+
+    if (out_value != NULL) *out_value = value;
+    return 1;
+}
+
+static int expression_is_known_zero(const AstNode *node) {
+    double value = 0.0;
+    return expression_constant_number(node, &value) && value == 0.0;
+}
+
+static int expression_is_known_nonzero(const AstNode *node) {
+    double value = 0.0;
+    return expression_constant_number(node, &value) && value != 0.0;
+}
+
+static int expression_is_known_integer(const AstNode *node,
+                                       long long *out_value) {
+    unsigned long long magnitude = 0ULL;
+    long long value;
+    int negative = 0;
+    const AstNode *literal = node;
+
+    if (node == NULL) return 0;
+
+    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
+        (node->token_type == TOKEN_PLUS || node->token_type == TOKEN_MINUS)) {
+        negative = node->token_type == TOKEN_MINUS;
+        literal = node->children[0];
+    }
+
+    if (!parse_integer_literal_magnitude(literal, &magnitude) ||
+        magnitude > 2147483648ULL)
+        return 0;
+
+    if (negative) {
+        if (magnitude == 2147483648ULL)
+            value = -2147483647LL - 1LL;
+        else
+            value = -(long long)magnitude;
+    } else {
+        if (magnitude > 2147483647ULL) return 0;
+        value = (long long)magnitude;
+    }
+
+    if (out_value != NULL) *out_value = value;
+    return 1;
 }
 
 static LlvmValue emit_division_zero_guard(CodegenContext *context,
@@ -1084,6 +1135,8 @@ static LlvmValue generate_binary(CodegenContext *context,
     LangType operation_type;
     const char *type_name;
     const char *instruction = NULL;
+    int divisor_known_nonzero = 0;
+    int sdiv_overflow_impossible = 0;
     char temp[LLVM_OPERAND_CAPACITY];
 
     if (node->child_count < 2U) return invalid_value();
@@ -1097,6 +1150,24 @@ static LlvmValue generate_binary(CodegenContext *context,
         codegen_error(context, node,
                       "divisao por zero comprovada estaticamente");
         return invalid_value();
+    }
+
+    if (node->token_type == TOKEN_INTEGER_DIV ||
+        node->token_type == TOKEN_SLASH)
+        divisor_known_nonzero =
+            expression_is_known_nonzero(node->children[1]);
+
+    if (node->token_type == TOKEN_INTEGER_DIV) {
+        long long left_constant = 0LL;
+        long long right_constant = 0LL;
+        int left_known =
+            expression_is_known_integer(node->children[0], &left_constant);
+        int right_known =
+            expression_is_known_integer(node->children[1], &right_constant);
+
+        if ((right_known && right_constant != -1LL) ||
+            (left_known && left_constant != (-2147483647LL - 1LL)))
+            sdiv_overflow_impossible = 1;
     }
 
     left = generate_expression(context, node->children[0]);
@@ -1210,15 +1281,17 @@ static LlvmValue generate_binary(CodegenContext *context,
     right = convert_value(context, node, right, operation_type);
     if (!left.valid || !right.valid) return invalid_value();
 
-    if (node->token_type == TOKEN_INTEGER_DIV ||
-        node->token_type == TOKEN_SLASH) {
+    if ((node->token_type == TOKEN_INTEGER_DIV ||
+         node->token_type == TOKEN_SLASH) &&
+        !divisor_known_nonzero) {
         right = emit_division_zero_guard(context, node, right, operation_type);
         if (!right.valid) return invalid_value();
-
-        if (node->token_type == TOKEN_INTEGER_DIV &&
-            !emit_sdiv_overflow_guard(context, node, left, right))
-            return invalid_value();
     }
+
+    if (node->token_type == TOKEN_INTEGER_DIV &&
+        !sdiv_overflow_impossible &&
+        !emit_sdiv_overflow_guard(context, node, left, right))
+        return invalid_value();
 
     if (operation_type == LANG_TYPE_INTEIRA) {
         if (node->token_type == TOKEN_PLUS)
