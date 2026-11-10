@@ -648,7 +648,11 @@ static void emit_runtime_declarations(CodegenContext *context) {
             "declare float @zl_pow_flut(float, float) nounwind\n"
             "declare double @zl_pow_duplo(double, double) nounwind\n"
             "declare float @zl_raiz_flut(float, i32) nounwind\n"
-            "declare double @zl_raiz_duplo(double, i32) nounwind\n\n");
+            "declare double @zl_raiz_duplo(double, i32) nounwind\n"
+            "declare void @zl_pino_modo(i32, i32) nounwind\n"
+            "declare void @zl_pino_escreve(i32, i32) nounwind\n"
+            "declare i32 @zl_pino_le(i32) nounwind\n"
+            "declare void @zl_espera(i32) nounwind\n\n");
 }
 
 static void new_temp(CodegenContext *context,
@@ -1374,6 +1378,73 @@ static LlvmValue generate_root_expression(CodegenContext *context,
     return make_value(result_type, temp);
 }
 
+static int is_platform_builtin_name(const char *name) {
+    return name != NULL &&
+           (strcmp(name, "pino_modo") == 0 ||
+            strcmp(name, "pino_escreve") == 0 ||
+            strcmp(name, "pino_le") == 0 ||
+            strcmp(name, "espera") == 0);
+}
+
+static LlvmValue generate_platform_builtin(CodegenContext *context,
+                                           const AstNode *node) {
+    LlvmValue a;
+    LlvmValue b;
+    char temp[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->lexeme == NULL)
+        return invalid_value();
+
+    if (strcmp(node->lexeme, "pino_modo") == 0 ||
+        strcmp(node->lexeme, "pino_escreve") == 0) {
+        if (node->child_count != 2U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        b = generate_expression(context, node->children[1]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        b = convert_value(context, node->children[1], b,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid || !b.valid) return invalid_value();
+
+        fprintf(context->out,
+                "  call void @zl_%s(i32 %s, i32 %s) nounwind ; linha %d\n",
+                node->lexeme, a.operand, b.operand, node->line);
+        return make_value(LANG_TYPE_VAZIO, "");
+    }
+
+    if (strcmp(node->lexeme, "pino_le") == 0) {
+        if (node->child_count != 1U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid) return invalid_value();
+
+        new_temp(context, temp);
+        fprintf(context->out,
+                "  %s = call i32 @zl_pino_le(i32 %s) nounwind ; linha %d\n",
+                temp, a.operand, node->line);
+        return make_value(LANG_TYPE_INTEIRA, temp);
+    }
+
+    if (strcmp(node->lexeme, "espera") == 0) {
+        if (node->child_count != 1U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid) return invalid_value();
+
+        fprintf(context->out,
+                "  call void @zl_espera(i32 %s) nounwind ; linha %d\n",
+                a.operand, node->line);
+        return make_value(LANG_TYPE_VAZIO, "");
+    }
+
+    return invalid_value();
+}
+
 static LlvmValue generate_user_call(CodegenContext *context,
                                     const AstNode *node) {
     const AstNode *function;
@@ -1386,6 +1457,9 @@ static LlvmValue generate_user_call(CodegenContext *context,
 
     if (node == NULL || node->lexeme == NULL)
         return invalid_value();
+
+    if (is_platform_builtin_name(node->lexeme))
+        return generate_platform_builtin(context, node);
 
     function = find_callable(context, node->lexeme);
     if (function == NULL) {
@@ -2201,6 +2275,12 @@ static int generate_builtin_call(CodegenContext *context,
                 "  store i32 %s, ptr %s ; linha %d\n",
                 temp, address.pointer, node->line);
         return 1;
+    }
+
+    if (node->lexeme != NULL &&
+        is_platform_builtin_name(node->lexeme)) {
+        value = generate_platform_builtin(context, node);
+        return value.valid;
     }
 
     value = generate_user_call(context, node);
