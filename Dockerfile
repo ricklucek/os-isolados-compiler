@@ -8,6 +8,7 @@ RUN apt-get update \
         clang-18 \
         llvm-18 \
         lld-18 \
+        mlir-18-tools \
         entr \
         gawk \
         libasan8 \

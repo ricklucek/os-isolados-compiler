@@ -26,6 +26,8 @@ const char *compiler_exit_code_name(CompilerExitCode code) {
         case COMPILER_EXIT_SEMANTIC_INTERNAL: return "falha_semantica";
         case COMPILER_EXIT_CODEGEN_ERROR: return "erro_codegen_llvm";
         case COMPILER_EXIT_CODEGEN_INTERNAL: return "falha_codegen_llvm";
+        case COMPILER_EXIT_MLIR_ERROR: return "erro_codegen_mlir";
+        case COMPILER_EXIT_MLIR_INTERNAL: return "falha_codegen_mlir";
         default: return "codigo_desconhecido";
     }
 }
