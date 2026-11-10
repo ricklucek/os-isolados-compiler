@@ -26,6 +26,7 @@ tests/validos/   programas Macaronica válidos
 tests/invalidos/ programas Macaronica inválidos
 tests/robustez/  testes de falhas, recuperação e entradas adversas
 tests/niveis/    programas de validação fornecidos na disciplina
+tests/dsl/       extensão vetorial do PjBL 4
 docs/            gramática, arquitetura e decisões de projeto/backend
 examples/        exemplos simples para execução manual
 ```
@@ -47,7 +48,7 @@ O projeto é compilado normalmente com:
 
 ## Ferramentas da Parte 2
 
-A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. O Checkpoint 9 já usa `llvm-as-18`, `opt-18`, `lli-18` e `clang-18` para validar e executar a primeira geração LLVM. MLIR será incorporado nos checkpoints do PjBL 4.
+A versão de referência adotada para o trabalho é **LLVM/MLIR 18.x**, conforme o material da disciplina. O PjBL 3 usa `llvm-as-18`, `opt-18`, `lli-18`, `llc-18` e `clang-18`. O Checkpoint 14 inicia o PjBL 4 pela DSL vetorial; o lowering MLIR entra no checkpoint seguinte.
 
 As decisões de geração, portabilidade e comportamento dependente do alvo ficam em `docs/decisoes_backend.md`.
 
@@ -333,6 +334,48 @@ O alvo usa:
 
 e exige a geração de um objeto AVR válido. A ligação com `zl_runtime_avr.c`, geração do `.hex` e gravação física entram na Parte D do PjBL 4.
 
+## DSL vetorial — PjBL 4 Parte A
+
+A extensão preserva o estilo da Macaronica e reutiliza os vetores já existentes.
+
+Operações elemento a elemento:
+
+```text
+c receba a + b;
+c receba a - b;
+c receba a * b;
+```
+
+Escalar × vetor:
+
+```text
+c receba 3 * a;
+c receba a * 3;
+```
+
+Reduções e produto escalar:
+
+```text
+total receba somavet(a);
+maior receba maxvet(a);
+produto receba prodesc(a, b);
+```
+
+Regras principais:
+
+- a DSL aritmética aceita vetores de `inteira`, `flut` e `duplocarpado`;
+- operações vetor-vetor exigem o mesmo tamanho;
+- `+` e `-` exigem dois vetores;
+- `*` admite vetor×vetor e escalar×vetor;
+- promoções seguem `inteira -> flut -> duplocarpado`;
+- o vetor de destino deve ter o mesmo tamanho e aceitar o tipo promovido;
+- `somavet` e `maxvet` devolvem escalar do tipo do elemento;
+- `prodesc` devolve escalar com o tipo numérico promovido dos dois vetores.
+
+A especificação formal fica em `docs/dsl.md`.
+
+Neste checkpoint a DSL é analisada até a semântica. Ela **não é expandida para laços LLVM**: `-o` em um programa que contém operação vetorial de primeira classe retorna erro controlado de codegen. O próximo checkpoint emitirá esses núcleos em MLIR e fará o lowering exigido pelo PjBL 4.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -365,6 +408,7 @@ make test-ast
 make test-semantic
 make test-backend-prep
 make test-llvm
+make test-dsl
 make test-robustness
 make test-delivery
 make test-levels
@@ -469,8 +513,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído
 - Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído
 - Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído
-- Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído nesta entrega
-- Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — próximo
+- Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído
+- Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído nesta entrega
+- Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — próximo
 
 
 ## Material de estudo e apresentação

@@ -1,0 +1,9 @@
+inteira principal() @
+[
+    palavra vet{4} nomes;
+    palavra vet{4} outros;
+    palavra vet{4} saidaVet;
+
+    saidaVet receba nomes + outros;
+    respost 0;
+]

@@ -1,0 +1,11 @@
+inteira principal() @
+[
+    inteira vet{4} a;
+    flut vet{4} b;
+    flut produto;
+
+    produto receba prodesc(a, b);
+    saida(produto);
+
+    respost 0;
+]

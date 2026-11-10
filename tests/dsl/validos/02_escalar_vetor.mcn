@@ -1,0 +1,10 @@
+inteira principal() @
+[
+    inteira vet{8} a;
+    flut vet{8} b;
+
+    b receba 3 * a;
+    b receba a * 2.5;
+
+    respost 0;
+]

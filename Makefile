@@ -11,7 +11,7 @@ CLANG_LLVM ?= clang-18
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -81,7 +81,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
@@ -161,6 +161,10 @@ test-llvm: $(TARGET)
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" LLVM_LLI="$(LLVM_LLI)" \
 		CLANG_LLVM="$(CLANG_LLVM)" sh tests/execucao/run.sh ./$(TARGET)
 
+test-dsl: $(TARGET)
+	@echo "== PjBL 4 Parte A: DSL vetorial =="
+	@sh tests/dsl/run.sh ./$(TARGET)
+
 test-robustness: $(TARGET)
 	@echo "== Robustez e tratamento de erros =="
 	@sh tests/robustez/run.sh ./$(TARGET)
@@ -204,4 +208,4 @@ clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
 		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-test.err .llvm-invalid.ll \
 		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll .llvm-audit.ll \
-		.llvm-avr.ll .llvm-avr.bc .llvm-avr.o macaronica-entrega.zip
+		.llvm-avr.ll .llvm-avr.bc .llvm-avr.o .dsl-test.out .dsl-test.ll macaronica-entrega.zip

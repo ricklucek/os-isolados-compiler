@@ -172,6 +172,7 @@ const char *ast_node_kind_name(AstNodeKind kind) {
         case AST_BINARY_EXPR: return "BINARY_EXPR";
         case AST_UNARY_EXPR: return "UNARY_EXPR";
         case AST_ROOT_EXPR: return "ROOT_EXPR";
+        case AST_VECTOR_REDUCTION: return "VECTOR_REDUCTION";
         default: return "UNKNOWN_AST_NODE";
     }
 }
@@ -196,8 +197,14 @@ static void ast_print_node(const AstNode *node, FILE *stream,
         node->token_type != TOKEN_INVALID)
         fprintf(stream, " <%s>", token_type_name(node->token_type));
 
-    if (node->inferred_type != LANG_TYPE_ERROR)
-        fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
+    if (node->inferred_type != LANG_TYPE_ERROR) {
+        if (node->inferred_is_vector)
+            fprintf(stream, " {tipo=%s,vetor=%zu}",
+                    lang_type_name(node->inferred_type),
+                    node->inferred_vector_size);
+        else
+            fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
+    }
 
     fprintf(stream, " @%d:%d\n", node->line, node->column);
 
@@ -215,8 +222,14 @@ void ast_print(const AstNode *node, FILE *stream) {
     fprintf(stream, "%s", ast_node_kind_name(node->kind));
     if (node->lexeme != NULL && node->lexeme[0] != '\0')
         fprintf(stream, " [%s]", node->lexeme);
-    if (node->inferred_type != LANG_TYPE_ERROR)
-        fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
+    if (node->inferred_type != LANG_TYPE_ERROR) {
+        if (node->inferred_is_vector)
+            fprintf(stream, " {tipo=%s,vetor=%zu}",
+                    lang_type_name(node->inferred_type),
+                    node->inferred_vector_size);
+        else
+            fprintf(stream, " {tipo=%s}", lang_type_name(node->inferred_type));
+    }
     fprintf(stream, " @%d:%d\n", node->line, node->column);
 
     for (i = 0U; i < node->child_count; ++i)

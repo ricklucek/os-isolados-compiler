@@ -33,13 +33,16 @@ typedef enum {
     AST_BOOL_LITERAL,
     AST_BINARY_EXPR,
     AST_UNARY_EXPR,
-    AST_ROOT_EXPR
+    AST_ROOT_EXPR,
+    AST_VECTOR_REDUCTION
 } AstNodeKind;
 
 typedef struct AstNode {
     AstNodeKind kind;
     TokenType token_type;
     LangType inferred_type;
+    int inferred_is_vector;
+    size_t inferred_vector_size;
     char *lexeme;
     int line;
     int column;

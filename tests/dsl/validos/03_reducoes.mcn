@@ -1,0 +1,11 @@
+inteira principal() @
+[
+    inteira vet{4} a;
+    inteira soma;
+    inteira maior;
+
+    soma receba somavet(a);
+    maior receba maxvet(a);
+
+    respost soma + maior;
+]
