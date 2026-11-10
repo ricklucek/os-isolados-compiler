@@ -103,3 +103,105 @@ make bench-info > resultados/maquina.txt
 ```
 
 O arquivo deve acompanhar tabelas/gráficos do relatório.
+
+
+## Implementação do Checkpoint 17
+
+### Fontes geradas a partir de Macaronica
+
+Os arquivos em `benchmarks/templates/` são fontes Macaronica parametrizadas por `@N@`. O runner gera uma fonte temporária para cada tamanho e chama o compilador do grupo com `--emit-mlir`. Nenhum kernel de benchmark é escrito manualmente em MLIR.
+
+Templates:
+
+- `elementwise.mcn.in`;
+- `prodesc.mcn.in`;
+- `sumfloat.mcn.in` para o experimento de associatividade.
+
+### C0
+
+`scripts/benchmark_variant.sh C0` executa canonicalização e o lowering normal até LLVM IR. O kernel é compilado com `-O0`.
+
+### C1
+
+Usa o mesmo LLVM IR de C0, mas o kernel é compilado com:
+
+```text
+-O2 -march=native
+-Rpass=loop-vectorize
+-Rpass-missed=loop-vectorize
+-Rpass-analysis=loop-vectorize
+```
+
+O diretório da variante guarda `rpass.txt` e `kernel_optimized.ll`.
+
+### C2
+
+Antes do lowering:
+
+```text
+--affine-super-vectorize="virtual-vector-size=8 vectorize-reductions=true"
+```
+
+A evidência intermediária fica em `01_vector.mlir`.
+
+Observação importante: os kernels elemento a elemento são `affine.for` e são candidatos diretos. As reduções atuais são emitidas como `scf.for`; portanto o passe affine pode não transformá-las. Essa ausência é registrada em vez de ser escondida e deve entrar na análise do relatório.
+
+### C3
+
+Aplica:
+
+```text
+--affine-parallelize="max-nested=1"
+--lower-affine
+--convert-scf-to-openmp
+--canonicalize
+--convert-openmp-to-llvm
+```
+
+A evidência `01_parallel.mlir` permite verificar se surgiu `affine.parallel`. Kernels com dependência de redução podem permanecer sequenciais.
+
+A compilação final usa `-O2 -march=native -fopenmp`. O mesmo executável é medido com `OMP_NUM_THREADS=1,2,4,...`.
+
+### Harness e medição
+
+O harness C é gerado automaticamente apenas para alimentar os kernels e cronometrá-los. Os kernels medidos continuam vindo da fonte Macaronica.
+
+Cada amostra mede o tempo médio de uma chamada ao kernel, usando `CLOCK_MONOTONIC`. O número interno de chamadas é escolhido para processar aproximadamente 50 milhões de elementos por amostra, salvo quando `--inner` é fornecido.
+
+Cada repetição recompila a variante e depois executa o binário, portanto há amostras independentes de:
+
+- `compile_ms`;
+- `run_ms`;
+- checksum numérico.
+
+### Dados e gráficos
+
+`scripts/benchmark.py` grava todas as amostras em `raw.csv` e medianas em `summary.csv`.
+
+`scripts/plot_benchmarks.py` gera SVGs de:
+
+- tempo de execução;
+- tempo de compilação;
+- speedup de C3 em relação a C0.
+
+### Experimento floating-point
+
+A fonte `sumfloat.mcn.in` usa `somavet` sobre `flut`.
+
+São comparadas:
+
+- **C1**: `fadd` estrito;
+- **C1F**: o LLVM IR derivado da mesma fonte é marcado experimentalmente com `fast` em `fadd/fmul`.
+
+C1F não é uma quinta configuração obrigatória; é uma variante controlada para responder à pergunta sobre associatividade/reordenação. O runner registra o checksum de ambas para permitir comparar desempenho e diferença numérica.
+
+### Execução oficial
+
+No ambiente da máquina escolhida:
+
+```bash
+make bench-info > resultados/benchmarks/maquina_previa.txt
+make bench
+```
+
+Não executar outras cargas pesadas em paralelo. Os arquivos de `resultados/` são ignorados pelo Git por padrão; para a entrega final, copiar/selecionar os CSV, gráficos e `maquina.txt` que serão efetivamente usados no relatório.

@@ -12,3 +12,8 @@ Thumbs.db
 # Temporários
 *.log
 *.tmp
+
+# Artefatos de compilacao/benchmark
+build/
+resultados/
+.bench-smoke/

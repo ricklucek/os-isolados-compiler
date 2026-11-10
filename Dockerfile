@@ -9,6 +9,8 @@ RUN apt-get update \
         llvm-18 \
         lld-18 \
         mlir-18-tools \
+        libomp-18-dev \
+        python3 \
         entr \
         gawk \
         libasan8 \
