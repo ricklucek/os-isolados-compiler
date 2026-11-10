@@ -205,3 +205,17 @@ make bench
 ```
 
 Não executar outras cargas pesadas em paralelo. Os arquivos de `resultados/` são ignorados pelo Git por padrão; para a entrega final, copiar/selecionar os CSV, gráficos e `maquina.txt` que serão efetivamente usados no relatório.
+
+
+## Ajuste metodológico após a primeira campanha real
+
+A primeira execução completa revelou que C2 estava sendo compilado com `-O0` após `affine-super-vectorize`, enquanto C1 e C3 recebiam `-O2 -march=native`. Isso mistura duas variáveis ao mesmo tempo: a decisão de vetorização e o nível de otimização final do LLVM.
+
+A partir do Checkpoint 18, C2 mantém a **vetorização explícita no MLIR**, mas o LLVM IR resultante é compilado com `-O2 -march=native`, igualando o estágio final de C1. Assim:
+
+- C1 = vetorização decidida pelo LLVM + O2;
+- C2 = vetorização decidida explicitamente pelo MLIR + O2;
+- C0 continua O0 como baseline;
+- C3 continua O2 + OpenMP.
+
+Os resultados C2 da campanha anterior devem ser substituídos por uma nova execução de `make bench`. C0/C1/C3 e o experimento C1/C1F permanecem metodologicamente válidos.

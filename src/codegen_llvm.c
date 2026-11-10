@@ -62,6 +62,7 @@ typedef struct {
     FILE *out;
     FILE *err;
     const AstNode *program;
+    CodegenLlvmTarget target;
     size_t error_count;
     int memory_error;
     size_t next_temp;
@@ -648,7 +649,12 @@ static void emit_runtime_declarations(CodegenContext *context) {
             "declare float @zl_pow_flut(float, float) nounwind\n"
             "declare double @zl_pow_duplo(double, double) nounwind\n"
             "declare float @zl_raiz_flut(float, i32) nounwind\n"
-            "declare double @zl_raiz_duplo(double, i32) nounwind\n\n");
+            "declare double @zl_raiz_duplo(double, i32) nounwind\n"
+            "declare void @zl_pino_modo(i32, i32) nounwind\n"
+            "declare void @zl_pino_escreve(i32, i32) nounwind\n"
+            "declare i32 @zl_pino_le(i32) nounwind\n"
+            "declare void @zl_espera(i32) nounwind\n"
+            "declare ptr @zl_vetor_endereco(ptr, i32, i32) nounwind\n\n");
 }
 
 static void new_temp(CodegenContext *context,
@@ -917,10 +923,35 @@ static LlvmAddress generate_vector_address(CodegenContext *context,
     }
 
     new_temp(context, element_pointer);
-    fprintf(context->out,
-            "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
-            element_pointer, storage->vector_size, element_type,
-            base_pointer, index.operand);
+    if (context->target == CODEGEN_LLVM_TARGET_AVR) {
+        unsigned element_size;
+
+        switch (storage->type) {
+            case LANG_TYPE_BOOL: element_size = 1U; break;
+            case LANG_TYPE_INTEIRA: element_size = 4U; break;
+            case LANG_TYPE_FLUT: element_size = 4U; break;
+            case LANG_TYPE_PALAVRA: element_size = 2U; break;
+            default:
+                codegen_error(context, node,
+                              "tipo vetorial %s nao possui tamanho AVR definido",
+                              lang_type_name(storage->type));
+                return invalid_address();
+        }
+
+        /*
+         * LLVM AVR 18 falha em alguns acessos dinamicos a arrays locais.
+         * O bounds check continua na IR; somente a aritmetica do endereco SRAM
+         * e delegada a um helper da plataforma compilado por avr-gcc.
+         */
+        fprintf(context->out,
+                "  %s = call ptr @zl_vetor_endereco(ptr %s, i32 %s, i32 %u) nounwind\n",
+                element_pointer, base_pointer, index.operand, element_size);
+    } else {
+        fprintf(context->out,
+                "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",
+                element_pointer, storage->vector_size, element_type,
+                base_pointer, index.operand);
+    }
 
     return make_address(storage->type, element_pointer);
 }
@@ -1374,6 +1405,75 @@ static LlvmValue generate_root_expression(CodegenContext *context,
     return make_value(result_type, temp);
 }
 
+static int is_platform_builtin_name(const char *name) {
+    return name != NULL &&
+           (strcmp(name, "pinomodo") == 0 ||
+            strcmp(name, "pinoescreve") == 0 ||
+            strcmp(name, "pinole") == 0 ||
+            strcmp(name, "espera") == 0);
+}
+
+static LlvmValue generate_platform_builtin(CodegenContext *context,
+                                           const AstNode *node) {
+    LlvmValue a;
+    LlvmValue b;
+    char temp[LLVM_OPERAND_CAPACITY];
+
+    if (node == NULL || node->lexeme == NULL)
+        return invalid_value();
+
+    if (strcmp(node->lexeme, "pinomodo") == 0 ||
+        strcmp(node->lexeme, "pinoescreve") == 0) {
+        if (node->child_count != 2U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        b = generate_expression(context, node->children[1]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        b = convert_value(context, node->children[1], b,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid || !b.valid) return invalid_value();
+
+        fprintf(context->out,
+                "  call void @%s(i32 %s, i32 %s) nounwind ; linha %d\n",
+                strcmp(node->lexeme, "pinomodo") == 0
+                    ? "zl_pino_modo" : "zl_pino_escreve",
+                a.operand, b.operand, node->line);
+        return make_value(LANG_TYPE_VAZIO, "");
+    }
+
+    if (strcmp(node->lexeme, "pinole") == 0) {
+        if (node->child_count != 1U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid) return invalid_value();
+
+        new_temp(context, temp);
+        fprintf(context->out,
+                "  %s = call i32 @zl_pino_le(i32 %s) nounwind ; linha %d\n",
+                temp, a.operand, node->line);
+        return make_value(LANG_TYPE_INTEIRA, temp);
+    }
+
+    if (strcmp(node->lexeme, "espera") == 0) {
+        if (node->child_count != 1U) return invalid_value();
+
+        a = generate_expression(context, node->children[0]);
+        a = convert_value(context, node->children[0], a,
+                          LANG_TYPE_INTEIRA);
+        if (!a.valid) return invalid_value();
+
+        fprintf(context->out,
+                "  call void @zl_espera(i32 %s) nounwind ; linha %d\n",
+                a.operand, node->line);
+        return make_value(LANG_TYPE_VAZIO, "");
+    }
+
+    return invalid_value();
+}
+
 static LlvmValue generate_user_call(CodegenContext *context,
                                     const AstNode *node) {
     const AstNode *function;
@@ -1386,6 +1486,9 @@ static LlvmValue generate_user_call(CodegenContext *context,
 
     if (node == NULL || node->lexeme == NULL)
         return invalid_value();
+
+    if (is_platform_builtin_name(node->lexeme))
+        return generate_platform_builtin(context, node);
 
     function = find_callable(context, node->lexeme);
     if (function == NULL) {
@@ -2203,6 +2306,12 @@ static int generate_builtin_call(CodegenContext *context,
         return 1;
     }
 
+    if (node->lexeme != NULL &&
+        is_platform_builtin_name(node->lexeme)) {
+        value = generate_platform_builtin(context, node);
+        return value.valid;
+    }
+
     value = generate_user_call(context, node);
     return value.valid;
 }
@@ -2706,15 +2815,17 @@ static int generate_program(CodegenContext *context,
     return generate_principal(context, principal);
 }
 
-CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
-                                        FILE *output,
-                                        FILE *error_stream) {
+CodegenLlvmResult codegen_llvm_generate_target(const AstNode *ast,
+                                               FILE *output,
+                                               FILE *error_stream,
+                                               CodegenLlvmTarget target) {
     CodegenContext context;
     CodegenLlvmResult result;
 
     memset(&context, 0, sizeof(context));
     context.out = output;
     context.err = error_stream != NULL ? error_stream : stderr;
+    context.target = target;
 
     if (output == NULL) {
         result.status = CODEGEN_LLVM_HAS_ERRORS;
@@ -2738,4 +2849,11 @@ CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
     free(context.globals);
     free(context.strings);
     return result;
+}
+
+CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
+                                        FILE *output,
+                                        FILE *error_stream) {
+    return codegen_llvm_generate_target(
+        ast, output, error_stream, CODEGEN_LLVM_TARGET_PORTABLE);
 }

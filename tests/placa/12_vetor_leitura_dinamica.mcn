@@ -1,0 +1,21 @@
+inteira principal() @
+[
+    inteira vet{5} valores;
+    inteira i;
+    inteira soma;
+
+    valores{0} receba 1;
+    valores{1} receba 2;
+    valores{2} receba 3;
+    valores{3} receba 4;
+    valores{4} receba 5;
+
+    soma receba 0;
+    repete ( i receba 0, i < 5, i receba i + 1 ) edai
+    [
+        soma receba soma + valores{i};
+    ]
+
+    saida(soma);
+    respost 0;
+]

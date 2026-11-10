@@ -10,6 +10,11 @@ RUN apt-get update \
         lld-18 \
         mlir-18-tools \
         libomp-18-dev \
+        gcc-avr \
+        avr-libc \
+        binutils-avr \
+        avrdude \
+        simavr \
         python3 \
         entr \
         gawk \

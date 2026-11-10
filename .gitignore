@@ -17,3 +17,8 @@ Thumbs.db
 build/
 resultados/
 .bench-smoke/
+
+# Intermediarios da placa (HEX/ELF finais podem ser selecionados para entrega)
+placa/*.ll
+placa/*.bc
+placa/*.o
