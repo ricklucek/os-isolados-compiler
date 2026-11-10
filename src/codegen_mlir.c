@@ -447,7 +447,7 @@ static int emit_sum_kernel(MlirContext *context,
 
     context->arg_count = 0U;
     context->next_value = 0U;
-    context->affine_loads = 0;
+    context->affine_loads = 1;
     if (!collect_args(context, expression)) return 0;
 
     kernel_id = context->kernel_count++;
@@ -487,7 +487,7 @@ static int emit_sum_kernel(MlirContext *context,
     next = make_value(result_type, add_name);
 
     fprintf(context->out,
-            "      scf.yield %s : %s\n",
+            "      affine.yield %s : %s\n",
             next.name, mlir_type(result_type));
     fprintf(context->out, "    }\n");
     fprintf(context->out,
@@ -510,7 +510,7 @@ static int emit_max_kernel(MlirContext *context,
 
     context->arg_count = 0U;
     context->next_value = 0U;
-    context->affine_loads = 0;
+    context->affine_loads = 1;
     if (!collect_args(context, expression)) return 0;
 
     kernel_id = context->kernel_count++;
@@ -556,7 +556,7 @@ static int emit_max_kernel(MlirContext *context,
             "      %s = arith.select %s, %s, %%acc : %s\n",
             selected, cmp, element.name, mlir_type(result_type));
     fprintf(context->out,
-            "      scf.yield %s : %s\n",
+            "      affine.yield %s : %s\n",
             selected, mlir_type(result_type));
     fprintf(context->out, "    }\n");
     fprintf(context->out,
@@ -581,7 +581,7 @@ static int emit_dot_kernel(MlirContext *context,
 
     context->arg_count = 0U;
     context->next_value = 0U;
-    context->affine_loads = 0;
+    context->affine_loads = 1;
     if (!collect_args(context, left_expr) ||
         !collect_args(context, right_expr))
         return 0;
@@ -634,7 +634,7 @@ static int emit_dot_kernel(MlirContext *context,
                 sum, product, mlir_type(result_type));
 
     fprintf(context->out,
-            "      scf.yield %s : %s\n",
+            "      affine.yield %s : %s\n",
             sum, mlir_type(result_type));
     fprintf(context->out, "    }\n");
     fprintf(context->out,
