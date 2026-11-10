@@ -16,9 +16,10 @@ EXPECTED=.llvm-test.expected
 INVALID=.llvm-invalid.ll
 UNSUPPORTED=.llvm-unsupported.ll
 M2R=.llvm-mem2reg.ll
+AVR_OBJ=.llvm-avr.o
 
 cleanup() {
-    rm -f "$IR" "$BC" "$PROG" "$OUT" "$ERR" "$EXPECTED" "$INVALID" "$UNSUPPORTED" "$M2R"
+    rm -f "$IR" "$BC" "$PROG" "$OUT" "$ERR" "$EXPECTED" "$INVALID" "$UNSUPPORTED" "$M2R" "$AVR_OBJ"
 }
 trap cleanup EXIT INT TERM
 cleanup
@@ -312,6 +313,138 @@ status=0
 grep -Fq 'codigo=1, linha=7' "$ERR" ||
     fail "erro de indice nao informou codigo/linha esperados"
 
+"$BIN" tests/execucao/19_aritmetica_precedencia.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou aritmetica de precedencia"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou aritmetica de precedencia"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou aritmetica de precedencia"
+"./$PROG" > "$OUT" || fail "aritmetica de precedencia retornou erro"
+tr -d '\r' < tests/execucao/19_aritmetica_precedencia.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida da precedencia divergiu"
+
+"$BIN" tests/execucao/20_condicional_aninhada.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou condicional aninhada"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou condicional aninhada"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou condicional aninhada"
+"./$PROG" > "$OUT" || fail "condicional aninhada retornou erro"
+tr -d '\r' < tests/execucao/20_condicional_aninhada.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida da condicional aninhada divergiu"
+
+"$BIN" tests/execucao/21_entrada_saida.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou entrada/saida"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou entrada/saida"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou entrada/saida"
+"./$PROG" < tests/execucao/21_entrada_saida.entrada > "$OUT" ||
+    fail "programa de entrada/saida retornou erro"
+tr -d '\r' < tests/execucao/21_entrada_saida.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de entrada/saida divergiu"
+
+"$BIN" tests/execucao/22_divisao_real_inteira.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou diferenca entre / e //"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou / e //"
+grep -q 'sdiv i32' "$IR" || fail "IR nao contem sdiv para //"
+grep -q 'fdiv float' "$IR" || fail "IR nao contem fdiv para /"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou / e //"
+"./$PROG" > "$OUT" || fail "programa de divisoes retornou erro"
+tr -d '\r' < tests/execucao/22_divisao_real_inteira.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de / e // divergiu"
+
+"$BIN" tests/execucao/23_tipos_mistos.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou tipos mistos"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou tipos mistos"
+grep -q 'sitofp i32' "$IR" || fail "promocao inteira -> real ausente"
+grep -q 'fpext float' "$IR" || fail "promocao flut -> duplocarpado ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou tipos mistos"
+"./$PROG" > "$OUT" || fail "tipos mistos retornaram erro"
+tr -d '\r' < tests/execucao/23_tipos_mistos.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de tipos mistos divergiu"
+
+"$BIN" tests/execucao/24_div_zero_dinamica_inteira.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou divisao inteira dinamica"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou guarda de divisao inteira"
+grep -q 'div.zero' "$IR" || fail "bloco div.zero ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou divisao inteira dinamica"
+status=0
+"./$PROG" > "$OUT" 2> "$ERR" || status=$?
+[ "$status" -eq 102 ] ||
+    fail "divisao inteira por zero esperava exit 102 e recebeu $status"
+grep -Fq 'codigo=2, linha=7' "$ERR" ||
+    fail "divisao inteira por zero nao informou codigo/linha esperados"
+
+"$BIN" tests/execucao/25_div_zero_dinamica_real.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou divisao real dinamica"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou guarda de divisao real"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou divisao real dinamica"
+status=0
+"./$PROG" > "$OUT" 2> "$ERR" || status=$?
+[ "$status" -eq 102 ] ||
+    fail "divisao real por zero esperava exit 102 e recebeu $status"
+grep -Fq 'codigo=2, linha=7' "$ERR" ||
+    fail "divisao real por zero nao informou codigo/linha esperados"
+
+"$BIN" tests/execucao/26_sdiv_overflow.mcn -o "$IR" >/dev/null ||
+    fail "nao gerou protecao de sdiv extremo"
+"$LLVM_OPT" -passes=verify "$IR" -disable-output ||
+    fail "verify rejeitou protecao de sdiv extremo"
+grep -q 'sdiv.overflow' "$IR" || fail "bloco sdiv.overflow ausente"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou sdiv extremo"
+status=0
+"./$PROG" > "$OUT" 2> "$ERR" || status=$?
+[ "$status" -eq 106 ] ||
+    fail "INT32_MIN // -1 esperava exit 106 e recebeu $status"
+grep -Fq 'codigo=6, linha=7' "$ERR" ||
+    fail "overflow de sdiv nao informou codigo/linha esperados"
+
+"$BIN" tests/execucao/27_int32_minimo.mcn -o "$IR" >/dev/null ||
+    fail "nao aceitou INT32_MIN valido"
+"$LLVM_AS" "$IR" -o /dev/null || fail "llvm-as rejeitou INT32_MIN"
+"$CLANG_LLVM" -std=c99 -Wall -Wextra -pedantic -Wno-override-module \
+    "$IR" runtime/zl_runtime_posix.c -Iruntime -lm -o "$PROG" ||
+    fail "clang nao ligou INT32_MIN"
+"./$PROG" > "$OUT" || fail "programa INT32_MIN retornou erro"
+tr -d '\r' < tests/execucao/27_int32_minimo.esperado > "$EXPECTED"
+cmp -s "$OUT" "$EXPECTED" || fail "saida de INT32_MIN divergiu"
+
+status=0
+"$BIN" tests/execucao/28_inteira_fora_i32.mcn -o "$UNSUPPORTED"     >/dev/null 2> "$ERR" || status=$?
+[ "$status" -eq 8 ] ||
+    fail "literal fora de i32 deveria retornar exit 8, recebeu $status"
+[ ! -e "$UNSUPPORTED" ] ||
+    fail "literal fora de i32 deixou LLVM parcial"
+grep -Fq 'nao cabe em i32' "$ERR" ||
+    fail "diagnostico de literal fora de i32 ausente"
+
+status=0
+"$BIN" tests/execucao/29_div_zero_constante.mcn -o "$UNSUPPORTED"     >/dev/null 2> "$ERR" || status=$?
+[ "$status" -eq 8 ] ||
+    fail "divisao por zero estatica deveria retornar exit 8, recebeu $status"
+[ ! -e "$UNSUPPORTED" ] ||
+    fail "divisao por zero estatica deixou LLVM parcial"
+grep -Fq 'divisao por zero comprovada estaticamente' "$ERR" ||
+    fail "diagnostico estatico de divisao por zero ausente"
+
 status=0
 "$BIN" tests/execucao/99_ainda_nao_suportado.mcn     -o "$UNSUPPORTED" >/dev/null 2>&1 || status=$?
 [ "$status" -eq 8 ] ||
@@ -319,4 +452,4 @@ status=0
 [ ! -e "$UNSUPPORTED" ] ||
     fail "falha controlada de codegen deixou LLVM parcial"
 
-echo "LLVM IR valida, vetores/registros/bounds executaveis e portaveis nos casos do checkpoint."
+echo "PjBL 3: IR valida, bateria obrigatoria e casos de borda aprovados."

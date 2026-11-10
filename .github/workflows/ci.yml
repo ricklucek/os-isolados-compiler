@@ -23,6 +23,8 @@ jobs:
           make inspect FILE=tests/niveis/nivel1_soma.mcn >/dev/null
           make check-dir DIR=tests/niveis
           make show-mem2reg FILE=tests/execucao/05_lacos.mcn >/dev/null
+          make audit-llvm FILE=tests/execucao/17_agregados_globais.mcn
+          make check-avr FILE=tests/execucao/02_variaveis_expressoes.mcn
       - name: Sanitizers
         run: make test-sanitize
       - name: Delivery package

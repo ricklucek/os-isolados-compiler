@@ -1,0 +1,10 @@
+inteira principal() @
+[
+    inteira minimo;
+    inteira divisor;
+
+    minimo receba -2147483648;
+    divisor receba -1;
+    minimo receba minimo // divisor;
+    respost 0;
+]
