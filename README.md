@@ -491,6 +491,54 @@ Para cada núcleo e tamanho, serão comparadas:
 
 Cada configuração terá no mínimo 5 execuções. Tempo de compilação e tempo de execução serão armazenados separadamente, e o valor reportado será a mediana. Os detalhes estão em `docs/benchmarks.md`.
 
+## Parte C — estudo experimental C0/C1/C2/C3
+
+A infraestrutura experimental é executável com:
+
+```bash
+make bench
+```
+
+Por padrão, a campanha usa:
+
+```text
+kernels: elementwise + prodesc
+N:       1.000.000 e 10.000.000
+reps:    5
+threads: 1, 2, 4, 8 para C3
+```
+
+e acrescenta o experimento `sumfloat` em C1/C1F para discutir reassociação floating-point.
+
+Configurações:
+
+- **C0**: lowering normal, kernel compilado em `-O0`;
+- **C1**: lowering normal + `clang -O2 -march=native`, com relatórios `-Rpass`;
+- **C2**: `affine-super-vectorize="virtual-vector-size=8 vectorize-reductions=true"`;
+- **C3**: `affine-parallelize` + OpenMP, compilação nativa otimizada;
+- **C1F**: variante adicional para a pergunta obrigatória, marcando `fadd/fmul` do LLVM IR como `fast`.
+
+Resultados:
+
+```text
+resultados/benchmarks/
+├── maquina.txt
+├── raw.csv
+├── summary.csv
+├── graficos/
+└── <kernel>/<N>/<config>/variant/
+```
+
+`raw.csv` mantém todas as amostras. `summary.csv` contém medianas de compilação e execução. Os gráficos SVG são gerados sem dependências Python externas.
+
+A CI usa apenas:
+
+```bash
+make bench-smoke
+```
+
+com N=1024, uma repetição e duas threads, para provar que C0–C3 compilam/executam. Esses tempos não devem ser usados no relatório.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -527,6 +575,7 @@ make test-dsl
 make test-mlir
 make test-hybrid
 make bench-info
+make bench-smoke
 make test-robustness
 make test-delivery
 make test-levels
@@ -634,8 +683,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído
 - Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído
 - Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — concluído
-- Checkpoint 16 — integração híbrida LLVM + MLIR e preparação experimental — concluído nesta entrega
-- Checkpoint 17 — PjBL 4 Parte C: C0/C1/C2/C3, benchmarks e gráficos — próximo
+- Checkpoint 16 — integração híbrida LLVM + MLIR e preparação experimental — concluído
+- Checkpoint 17 — PjBL 4 Parte C: C0/C1/C2/C3, benchmarks e gráficos — concluído nesta entrega
+- Checkpoint 18 — PjBL 4 Parte D: runtime AVR, --alvo=uno, memória e geração .hex — próximo
 
 
 ## Material de estudo e apresentação

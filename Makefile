@@ -14,7 +14,7 @@ MLIR_TRANSLATE ?= mlir-translate-18
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run bench-info run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm emit-mlir mlir-pipeline hybrid-build hybrid-run bench-info bench bench-smoke test-bench run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -75,6 +75,41 @@ hybrid-run: hybrid-build
 bench-info:
 	@sh scripts/system_info.sh
 
+BENCH_SIZES ?= 1000000,10000000
+BENCH_REPS ?= 5
+BENCH_THREADS ?= 1,2,4,8
+BENCH_OUT ?= resultados/benchmarks
+
+bench: $(TARGET)
+	@python3 scripts/benchmark.py \
+		--sizes "$(BENCH_SIZES)" \
+		--reps "$(BENCH_REPS)" \
+		--threads "$(BENCH_THREADS)" \
+		--output "$(BENCH_OUT)" \
+		--fastmath-experiment
+
+bench-smoke: $(TARGET)
+	@rm -rf .bench-smoke
+	@python3 scripts/benchmark.py \
+		--sizes 1024 \
+		--reps 1 \
+		--threads 1,2 \
+		--configs C0,C1,C2,C3 \
+		--kernels elementwise,prodesc \
+		--inner 2 \
+		--fastmath-experiment \
+		--output .bench-smoke
+	@test -s .bench-smoke/raw.csv
+	@test -s .bench-smoke/summary.csv
+	@test -s .bench-smoke/graficos/runtime_elementwise_1024.svg
+	@grep -q 'vector<' .bench-smoke/elementwise/1024/C2/variant/01_vector.mlir
+	@grep -q 'affine.parallel' .bench-smoke/elementwise/1024/C3/variant/01_parallel.mlir
+	@! grep -q 'fadd fast' .bench-smoke/sumfloat/1024/C1/variant/kernel.ll
+	@grep -q 'fadd fast' .bench-smoke/sumfloat/1024/C1F/variant/kernel.ll
+	@echo "Benchmark smoke C0/C1/C2/C3 + fast-math: OK."
+
+test-bench: bench-smoke
+
 run-llvm: $(TARGET)
 	@test -n "$(FILE)" || { echo "Uso: make run-llvm FILE=programa.mcn"; exit 1; }
 	@LLVM_AS="$(LLVM_AS)" LLVM_OPT="$(LLVM_OPT)" CLANG_LLVM="$(CLANG_LLVM)" \
@@ -109,7 +144,7 @@ package:
 	@git archive --format=zip --output=macaronica-entrega.zip HEAD
 	@echo "Pacote criado: macaronica-entrega.zip (somente arquivos versionados)."
 
-test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-robustness test-delivery test-levels
+test: test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-dsl test-mlir test-hybrid test-bench test-robustness test-delivery test-levels
 
 test-lexer: $(TARGET)
 	@echo "== Casos lexicos validos =="
