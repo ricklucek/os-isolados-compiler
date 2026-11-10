@@ -519,6 +519,33 @@ static AstNode *parse_primary(Parser *parser) {
         return root;
     }
 
+    token = match(parser, TOKEN_SOMAVET);
+    if (token == NULL) token = match(parser, TOKEN_MAXVET);
+    if (token == NULL) token = match(parser, TOKEN_PRODESC);
+    if (token != NULL) {
+        AstNode *reduction =
+            node_from_token(parser, AST_VECTOR_REDUCTION, token);
+        if (reduction == NULL) return NULL;
+
+        if (consume(parser, TOKEN_LEFT_PAREN,
+                    "operacao vetorial exige '('") == NULL) {
+            ast_free(reduction);
+            return NULL;
+        }
+
+        if (!parse_argument_list_into(parser, reduction)) {
+            ast_free(reduction);
+            return NULL;
+        }
+
+        if (consume(parser, TOKEN_RIGHT_PAREN,
+                    "operacao vetorial exige ')'") == NULL) {
+            ast_free(reduction);
+            return NULL;
+        }
+        return reduction;
+    }
+
     token = match(parser, TOKEN_IDENTIFIER);
     if (token != NULL) {
         if (match(parser, TOKEN_LEFT_PAREN) != NULL) {

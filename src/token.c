@@ -91,6 +91,9 @@ const char *token_type_name(TokenType type) {
         case TOKEN_NAO: return "NAO";
         case TOKEN_XOR: return "XOR";
         case TOKEN_RAIZ: return "RAIZ";
+        case TOKEN_SOMAVET: return "SOMAVET";
+        case TOKEN_MAXVET: return "MAXVET";
+        case TOKEN_PRODESC: return "PRODESC";
         case TOKEN_PLUS: return "PLUS";
         case TOKEN_MINUS: return "MINUS";
         case TOKEN_STAR: return "STAR";

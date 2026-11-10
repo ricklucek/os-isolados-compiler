@@ -1141,6 +1141,12 @@ static LlvmValue generate_binary(CodegenContext *context,
 
     if (node->child_count < 2U) return invalid_value();
 
+    if (node->inferred_is_vector) {
+        codegen_error(context, node,
+                      "operacao vetorial DSL requer lowering via MLIR (PjBL 4 Parte B)");
+        return invalid_value();
+    }
+
     if (node->token_type == TOKEN_E || node->token_type == TOKEN_OU)
         return generate_short_circuit(context, node);
 
@@ -1532,6 +1538,11 @@ static LlvmValue generate_expression(CodegenContext *context,
         case AST_ROOT_EXPR:
             return generate_root_expression(context, node);
 
+        case AST_VECTOR_REDUCTION:
+            codegen_error(context, node,
+                          "reducao vetorial DSL requer lowering via MLIR (PjBL 4 Parte B)");
+            return invalid_value();
+
         case AST_CALL:
             if (node->lexeme != NULL &&
                 (strcmp(node->lexeme, "entrada") == 0 ||
@@ -1760,6 +1771,12 @@ static int generate_assignment(CodegenContext *context,
 
     if (node == NULL || node->child_count < 2U) return 0;
     target = node->children[0];
+
+    if (target != NULL && target->inferred_is_vector) {
+        codegen_error(context, node,
+                      "atribuicao vetorial DSL requer lowering via MLIR (PjBL 4 Parte B)");
+        return 0;
+    }
 
     address = generate_lvalue_address(context, target);
     if (!address.valid) return 0;

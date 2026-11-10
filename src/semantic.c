@@ -346,16 +346,15 @@ static LangType evaluate_field_access(SemanticContext *context,
 }
 
 static LangType evaluate_identifier(SemanticContext *context,
-                                    const AstNode *node) {
+                                    AstNode *node) {
     const Symbol *symbol =
         lookup_value_symbol(context, node, node != NULL ? node->lexeme : NULL);
     if (symbol == NULL) return LANG_TYPE_ERROR;
 
     if (symbol->kind == SYMBOL_VECTOR) {
-        semantic_error(context, node,
-                       "vetor '%s' deve ser acessado com um indice",
-                       symbol->name);
-        return LANG_TYPE_ERROR;
+        node->inferred_is_vector = 1;
+        node->inferred_vector_size = symbol->vector_size;
+        return symbol->type;
     }
     if (symbol->kind != SYMBOL_VARIABLE && symbol->kind != SYMBOL_PARAMETER) {
         semantic_error(context, node, "'%s' e %s e nao pode ser usado como valor",
@@ -471,6 +470,11 @@ static LangType evaluate_call(SemanticContext *context, const AstNode *node) {
         }
         value_type = evaluate_expression(context, node->children[0]);
         if (value_type == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+        if (node->children[0]->inferred_is_vector) {
+            semantic_error(context, node->children[0],
+                           "saida nao aceita vetor inteiro; use indice ou reducao DSL");
+            return LANG_TYPE_ERROR;
+        }
         if (value_type == LANG_TYPE_VAZIO) {
             semantic_error(context, node->children[0],
                            "saida nao pode receber expressao do tipo vazio");
@@ -499,6 +503,16 @@ static LangType evaluate_call(SemanticContext *context, const AstNode *node) {
 
     for (i = 0U; i < node->child_count; ++i) {
         LangType argument_type = evaluate_expression(context, node->children[i]);
+
+        if (argument_type != LANG_TYPE_ERROR &&
+            node->children[i]->inferred_is_vector) {
+            semantic_error(context, node->children[i],
+                           "funcao escalar '%s' nao aceita vetor como argumento %zu",
+                           node->lexeme != NULL ? node->lexeme : "<sem-nome>",
+                           i + 1U);
+            continue;
+        }
+
         if (symbol != NULL && i < symbol->parameter_count &&
             argument_type != LANG_TYPE_ERROR &&
             !lang_type_can_assign(symbol->parameter_types[i], argument_type)) {
@@ -513,8 +527,72 @@ static LangType evaluate_call(SemanticContext *context, const AstNode *node) {
     return symbol != NULL ? symbol->type : LANG_TYPE_ERROR;
 }
 
+static LangType evaluate_vector_reduction(SemanticContext *context,
+                                          AstNode *node) {
+    size_t expected =
+        node->token_type == TOKEN_PRODESC ? 2U : 1U;
+    LangType first_type = LANG_TYPE_ERROR;
+    LangType second_type = LANG_TYPE_ERROR;
+    size_t first_size = 0U;
+    size_t second_size = 0U;
+
+    if (node->child_count != expected) {
+        semantic_error(context, node,
+                       "operacao '%s' espera %zu vetor(es), recebeu %zu",
+                       node->lexeme != NULL ? node->lexeme : "<dsl>",
+                       expected, node->child_count);
+        return LANG_TYPE_ERROR;
+    }
+
+    first_type = evaluate_expression(context, node->children[0]);
+    if (first_type == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+    if (!node->children[0]->inferred_is_vector) {
+        semantic_error(context, node->children[0],
+                       "operacao '%s' exige vetor como primeiro argumento",
+                       node->lexeme);
+        return LANG_TYPE_ERROR;
+    }
+    first_size = node->children[0]->inferred_vector_size;
+
+    if (!lang_type_is_numeric(first_type)) {
+        semantic_error(context, node->children[0],
+                       "DSL vetorial aceita apenas vetores numericos, encontrado vetor de %s",
+                       lang_type_name(first_type));
+        return LANG_TYPE_ERROR;
+    }
+
+    if (node->token_type == TOKEN_PRODESC) {
+        second_type = evaluate_expression(context, node->children[1]);
+        if (second_type == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+        if (!node->children[1]->inferred_is_vector) {
+            semantic_error(context, node->children[1],
+                           "prodesc exige vetor como segundo argumento");
+            return LANG_TYPE_ERROR;
+        }
+        second_size = node->children[1]->inferred_vector_size;
+
+        if (!lang_type_is_numeric(second_type)) {
+            semantic_error(context, node->children[1],
+                           "DSL vetorial aceita apenas vetores numericos, encontrado vetor de %s",
+                           lang_type_name(second_type));
+            return LANG_TYPE_ERROR;
+        }
+
+        if (first_size != second_size) {
+            semantic_error(context, node,
+                           "prodesc exige vetores do mesmo tamanho, encontrados %zu e %zu",
+                           first_size, second_size);
+            return LANG_TYPE_ERROR;
+        }
+
+        return lang_type_common_numeric(first_type, second_type);
+    }
+
+    return first_type;
+}
+
 static LangType evaluate_binary(SemanticContext *context,
-                                const AstNode *node) {
+                                AstNode *node) {
     LangType left;
     LangType right;
     LangType common;
@@ -524,6 +602,54 @@ static LangType evaluate_binary(SemanticContext *context,
     right = evaluate_expression(context, node->children[1]);
     if (left == LANG_TYPE_ERROR || right == LANG_TYPE_ERROR)
         return LANG_TYPE_ERROR;
+
+    if (node->children[0]->inferred_is_vector ||
+        node->children[1]->inferred_is_vector) {
+        const int left_vector = node->children[0]->inferred_is_vector;
+        const int right_vector = node->children[1]->inferred_is_vector;
+        size_t vector_size = left_vector
+                                 ? node->children[0]->inferred_vector_size
+                                 : node->children[1]->inferred_vector_size;
+
+        if (node->token_type != TOKEN_PLUS &&
+            node->token_type != TOKEN_MINUS &&
+            node->token_type != TOKEN_STAR) {
+            semantic_error(context, node,
+                           "operador '%s' nao e definido para vetores na DSL",
+                           node->lexeme != NULL ? node->lexeme : "<desconhecido>");
+            return LANG_TYPE_ERROR;
+        }
+
+        if (!lang_type_is_numeric(left) || !lang_type_is_numeric(right)) {
+            semantic_error(context, node,
+                           "DSL vetorial exige elementos numericos, encontrados %s e %s",
+                           lang_type_name(left), lang_type_name(right));
+            return LANG_TYPE_ERROR;
+        }
+
+        if (left_vector && right_vector) {
+            if (node->children[0]->inferred_vector_size !=
+                node->children[1]->inferred_vector_size) {
+                semantic_error(
+                    context, node,
+                    "operacao vetorial exige tamanhos iguais, encontrados %zu e %zu",
+                    node->children[0]->inferred_vector_size,
+                    node->children[1]->inferred_vector_size);
+                return LANG_TYPE_ERROR;
+            }
+        } else if (node->token_type != TOKEN_STAR) {
+            semantic_error(context, node,
+                           "apenas multiplicacao admite escalar com vetor; operador '%s' exige dois vetores",
+                           node->lexeme);
+            return LANG_TYPE_ERROR;
+        }
+
+        common = lang_type_common_numeric(left, right);
+        if (common == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+        node->inferred_is_vector = 1;
+        node->inferred_vector_size = vector_size;
+        return common;
+    }
 
     switch (node->token_type) {
         case TOKEN_OU:
@@ -605,6 +731,12 @@ static LangType evaluate_unary(SemanticContext *context,
     if (node == NULL || node->child_count == 0U) return LANG_TYPE_ERROR;
     operand = evaluate_expression(context, node->children[0]);
     if (operand == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+    if (node->children[0]->inferred_is_vector) {
+        semantic_error(context, node,
+                       "operador unario '%s' nao aceita vetor na DSL",
+                       node->lexeme != NULL ? node->lexeme : "<desconhecido>");
+        return LANG_TYPE_ERROR;
+    }
 
     if (node->token_type == TOKEN_NAO) {
         if (operand == LANG_TYPE_BOOL) return LANG_TYPE_BOOL;
@@ -632,6 +764,11 @@ static LangType evaluate_root(SemanticContext *context,
     if (node == NULL || node->child_count == 0U) return LANG_TYPE_ERROR;
     argument = evaluate_expression(context, node->children[0]);
     if (argument == LANG_TYPE_ERROR) return LANG_TYPE_ERROR;
+    if (node->children[0]->inferred_is_vector) {
+        semantic_error(context, node,
+                       "raiz() escalar nao aceita vetor; use uma operacao DSL adequada");
+        return LANG_TYPE_ERROR;
+    }
     if (!lang_type_is_numeric(argument)) {
         semantic_error(context, node,
                        "raiz exige argumento numerico, encontrado %s",
@@ -647,6 +784,9 @@ static LangType evaluate_expression(SemanticContext *context,
     LangType result = LANG_TYPE_ERROR;
 
     if (node == NULL || context->memory_error) return LANG_TYPE_ERROR;
+
+    node->inferred_is_vector = 0;
+    node->inferred_vector_size = 0U;
 
     switch (node->kind) {
         case AST_INTEGER_LITERAL:
@@ -681,6 +821,9 @@ static LangType evaluate_expression(SemanticContext *context,
             break;
         case AST_ROOT_EXPR:
             result = evaluate_root(context, node);
+            break;
+        case AST_VECTOR_REDUCTION:
+            result = evaluate_vector_reduction(context, node);
             break;
         default:
             semantic_error(context, node,
@@ -741,14 +884,66 @@ static void analyze_assignment(SemanticContext *context,
                                const AstNode *node) {
     LangType target;
     LangType value;
+    AstNode *target_node;
+    AstNode *value_node;
+    const Symbol *target_symbol = NULL;
+
     if (node == NULL || node->child_count < 2U) {
         semantic_error(context, node, "atribuicao incompleta na AST");
         return;
     }
 
-    target = evaluate_lvalue(context, node->children[0]);
-    value = evaluate_expression(context, node->children[1]);
+    target_node = node->children[0];
+    value_node = node->children[1];
+
+    if (target_node != NULL && target_node->kind == AST_IDENTIFIER)
+        target_symbol =
+            symbol_table_lookup(&context->symbols, target_node->lexeme);
+
+    if (target_symbol != NULL && target_symbol->kind == SYMBOL_VECTOR) {
+        target_node->inferred_type = target_symbol->type;
+        target_node->inferred_is_vector = 1;
+        target_node->inferred_vector_size = target_symbol->vector_size;
+
+        value = evaluate_expression(context, value_node);
+        if (value == LANG_TYPE_ERROR) return;
+
+        if (!value_node->inferred_is_vector) {
+            semantic_error(context, node,
+                           "atribuicao ao vetor '%s' exige expressao vetorial",
+                           target_symbol->name);
+            return;
+        }
+
+        if (value_node->inferred_vector_size != target_symbol->vector_size) {
+            semantic_error(
+                context, node,
+                "atribuicao vetorial exige tamanho %zu, expressao produz tamanho %zu",
+                target_symbol->vector_size,
+                value_node->inferred_vector_size);
+            return;
+        }
+
+        if (!lang_type_can_assign(target_symbol->type, value)) {
+            semantic_error(
+                context, node,
+                "atribuicao vetorial incompativel: destino vet[%zu] %s, resultado %s",
+                target_symbol->vector_size,
+                lang_type_name(target_symbol->type),
+                lang_type_name(value));
+        }
+        return;
+    }
+
+    target = evaluate_lvalue(context, target_node);
+    value = evaluate_expression(context, value_node);
     if (target == LANG_TYPE_ERROR || value == LANG_TYPE_ERROR) return;
+
+    if (value_node->inferred_is_vector) {
+        semantic_error(context, node,
+                       "destino escalar nao pode receber expressao vetorial");
+        return;
+    }
 
     if (!lang_type_can_assign(target, value))
         semantic_error(context, node,
@@ -767,6 +962,13 @@ static void analyze_return(SemanticContext *context, const AstNode *node) {
 
     if (node->child_count > 0U)
         value_type = evaluate_expression(context, node->children[0]);
+
+    if (node->child_count > 0U &&
+        node->children[0]->inferred_is_vector) {
+        semantic_error(context, node,
+                       "respost nao aceita valor vetorial");
+        return;
+    }
 
     if (context->current_return_type == LANG_TYPE_VAZIO) {
         if (node->child_count > 0U && value_type != LANG_TYPE_ERROR)
@@ -798,6 +1000,12 @@ static void require_bool_condition(SemanticContext *context,
                                    AstNode *condition,
                                    const char *construct_name) {
     LangType type = evaluate_expression(context, condition);
+    if (type != LANG_TYPE_ERROR && condition->inferred_is_vector) {
+        semantic_error(context, condition,
+                       "condicao de %s nao pode ser vetorial",
+                       construct_name);
+        return;
+    }
     if (type != LANG_TYPE_ERROR && type != LANG_TYPE_BOOL)
         semantic_error(context, condition,
                        "condicao de %s deve resultar em bool, encontrado %s",

@@ -37,7 +37,9 @@ static const Keyword KEYWORDS[] = {
     {"registro", TOKEN_REGISTRO}, {"outrafuncao", TOKEN_OUTRAFUNCAO},
     {"edai", TOKEN_EDAI}, {"vet", TOKEN_VET},
     {"VER", TOKEN_VER}, {"FAL", TOKEN_FAL}, {"OU", TOKEN_OU},
-    {"E", TOKEN_E}, {"XOR", TOKEN_XOR}, {"raiz", TOKEN_RAIZ}
+    {"E", TOKEN_E}, {"XOR", TOKEN_XOR}, {"raiz", TOKEN_RAIZ},
+    {"somavet", TOKEN_SOMAVET}, {"maxvet", TOKEN_MAXVET},
+    {"prodesc", TOKEN_PRODESC}
 };
 
 static int is_ascii_alpha(char c) {
