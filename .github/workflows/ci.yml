@@ -31,6 +31,8 @@ jobs:
           make check-avr FILE=tests/execucao/02_variaveis_expressoes.mcn
           make test-dsl
           make mlir-pipeline FILE=tests/dsl/validos/01_elementwise.mcn OUTDIR=.ci-mlir >/dev/null
+          make test-hybrid
+          make bench-info >/dev/null
       - name: Sanitizers
         run: make test-sanitize
       - name: Delivery package

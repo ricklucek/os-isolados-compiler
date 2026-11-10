@@ -3,14 +3,14 @@
 /*
  * Primeiro back-end LLVM da Macaronica.
  *
- * O Checkpoint 13 fecha o hardening do PjBL 3:
- * - divisao por zero detectada estaticamente quando possivel e em runtime nos demais casos;
- * - protecao de INT32_MIN // -1 antes de sdiv;
- * - literais inteira obrigatoriamente representaveis em i32.
+ * O Checkpoint 16 integra a DSL vetorial ao programa escalar:
+ * - o backend LLVM emite declaracoes/chamadas para os kernels gerados em MLIR;
+ * - memrefs estaticos usam a ABI expandida do MLIR 18
+ *   (allocated, aligned, offset, size, stride);
+ * - llvm-link resolve as declaracoes contra as definicoes dos kernels.
  *
- * A IR continua sem offsets manuais, target triple ou target datalayout. Quando um programa valido usa uma
- * construcao ainda nao rebaixada, o gerador falha de forma controlada e o
- * arquivo de saida e removido pelo chamador.
+ * A IR escalar continua sem target triple/datalayout e o lowering vetorial
+ * permanece responsabilidade do backend MLIR.
  */
 
 #include <stdarg.h>
@@ -51,6 +51,12 @@ typedef struct {
     char pointer[LLVM_OPERAND_CAPACITY];
     int valid;
 } LlvmAddress;
+
+typedef struct {
+    const AstNode **items;
+    size_t count;
+    size_t capacity;
+} KernelArgList;
 
 typedef struct {
     FILE *out;
@@ -1762,6 +1768,332 @@ static void deactivate_scope(CodegenContext *context, size_t scope_depth) {
             context->locals[i].active = 0;
 }
 
+static void kernel_arg_list_free(KernelArgList *list) {
+    if (list == NULL) return;
+    free(list->items);
+    memset(list, 0, sizeof(*list));
+}
+
+static int kernel_arg_list_add(CodegenContext *context,
+                               KernelArgList *list,
+                               const AstNode *node) {
+    const AstNode **grown;
+    size_t new_capacity;
+    size_t i;
+
+    if (node == NULL || node->kind != AST_IDENTIFIER ||
+        node->lexeme == NULL)
+        return 1;
+
+    for (i = 0U; i < list->count; ++i) {
+        const AstNode *existing = list->items[i];
+        if (existing != NULL && existing->lexeme != NULL &&
+            existing->inferred_is_vector == node->inferred_is_vector &&
+            strcmp(existing->lexeme, node->lexeme) == 0)
+            return 1;
+    }
+
+    if (list->count == list->capacity) {
+        new_capacity = list->capacity == 0U
+                           ? CODEGEN_INITIAL_CAPACITY
+                           : list->capacity * 2U;
+        grown = realloc(list->items,
+                        new_capacity * sizeof(*grown));
+        if (grown == NULL) {
+            codegen_memory_error(context);
+            return 0;
+        }
+        list->items = grown;
+        list->capacity = new_capacity;
+    }
+
+    list->items[list->count++] = node;
+    return 1;
+}
+
+static int collect_kernel_args(CodegenContext *context,
+                               KernelArgList *list,
+                               const AstNode *node) {
+    size_t i;
+
+    if (node == NULL || context->memory_error)
+        return !context->memory_error;
+
+    if (node->kind == AST_IDENTIFIER)
+        return kernel_arg_list_add(context, list, node);
+
+    for (i = 0U; i < node->child_count; ++i)
+        if (!collect_kernel_args(context, list, node->children[i]))
+            return 0;
+
+    return 1;
+}
+
+static void mlir_kernel_name(const AstNode *assignment,
+                             char buffer[LLVM_OPERAND_CAPACITY]) {
+    snprintf(buffer, LLVM_OPERAND_CAPACITY,
+             "zl_mlir_kernel_l%d_c%d",
+             assignment->line, assignment->column);
+}
+
+static int is_mlir_kernel_assignment(const AstNode *node) {
+    const AstNode *target;
+    const AstNode *value;
+
+    if (node == NULL || node->kind != AST_ASSIGNMENT ||
+        node->child_count < 2U)
+        return 0;
+
+    target = node->children[0];
+    value = node->children[1];
+
+    return (target != NULL && target->inferred_is_vector &&
+            value != NULL && value->inferred_is_vector) ||
+           (value != NULL && value->kind == AST_VECTOR_REDUCTION);
+}
+
+static void emit_memref_signature(FILE *out) {
+    fprintf(out, "ptr, ptr, i64, i64, i64");
+}
+
+static void emit_kernel_arg_signature(FILE *out,
+                                      const AstNode *arg) {
+    if (arg->inferred_is_vector)
+        emit_memref_signature(out);
+    else
+        fprintf(out, "%s", llvm_type(arg->inferred_type));
+}
+
+static int emit_kernel_declaration(CodegenContext *context,
+                                   const AstNode *assignment) {
+    const AstNode *target = assignment->children[0];
+    const AstNode *value = assignment->children[1];
+    KernelArgList args;
+    char name[LLVM_OPERAND_CAPACITY];
+    size_t i;
+
+    memset(&args, 0, sizeof(args));
+    if (!collect_kernel_args(context, &args, value)) {
+        kernel_arg_list_free(&args);
+        return 0;
+    }
+
+    mlir_kernel_name(assignment, name);
+
+    if (value->kind == AST_VECTOR_REDUCTION)
+        fprintf(context->out, "declare %s @%s(",
+                llvm_type(value->inferred_type), name);
+    else
+        fprintf(context->out, "declare void @%s(", name);
+
+    for (i = 0U; i < args.count; ++i) {
+        if (i > 0U) fprintf(context->out, ", ");
+        emit_kernel_arg_signature(context->out, args.items[i]);
+    }
+
+    if (target->inferred_is_vector) {
+        if (args.count > 0U) fprintf(context->out, ", ");
+        emit_memref_signature(context->out);
+    }
+
+    fprintf(context->out, ") nounwind\n");
+    kernel_arg_list_free(&args);
+    return 1;
+}
+
+static int emit_kernel_declarations_recursive(CodegenContext *context,
+                                              const AstNode *node) {
+    size_t i;
+
+    if (node == NULL || context->memory_error)
+        return !context->memory_error;
+
+    if (is_mlir_kernel_assignment(node))
+        if (!emit_kernel_declaration(context, node))
+            return 0;
+
+    for (i = 0U; i < node->child_count; ++i)
+        if (!emit_kernel_declarations_recursive(context,
+                                                node->children[i]))
+            return 0;
+
+    return 1;
+}
+
+static int emit_memref_call_args(CodegenContext *context,
+                                 const AstNode *node,
+                                 int *need_comma) {
+    const Storage *storage;
+    char pointer[LLVM_OPERAND_CAPACITY];
+
+    storage = lookup_storage(context, node->lexeme);
+    if (storage == NULL || !storage->is_vector) {
+        codegen_error(context, node,
+                      "vetor '%s' nao possui storage para chamada MLIR",
+                      node->lexeme != NULL ? node->lexeme : "<sem-nome>");
+        return 0;
+    }
+
+    storage_pointer(storage, pointer);
+    if (*need_comma) fprintf(context->out, ", ");
+    fprintf(context->out,
+            "ptr %s, ptr %s, i64 0, i64 %zu, i64 1",
+            pointer, pointer, storage->vector_size);
+    *need_comma = 1;
+    return 1;
+}
+
+static LlvmValue *prepare_kernel_scalar_args(
+    CodegenContext *context, const KernelArgList *args) {
+    LlvmValue *values;
+    size_t i;
+
+    values = calloc(args->count == 0U ? 1U : args->count,
+                    sizeof(*values));
+    if (values == NULL) {
+        codegen_memory_error(context);
+        return NULL;
+    }
+
+    for (i = 0U; i < args->count; ++i) {
+        const AstNode *arg = args->items[i];
+        if (arg->inferred_is_vector) continue;
+
+        values[i] = generate_identifier(context, arg);
+        if (!values[i].valid) {
+            free(values);
+            return NULL;
+        }
+    }
+
+    return values;
+}
+
+static int emit_kernel_call_args(CodegenContext *context,
+                                 const KernelArgList *args,
+                                 const LlvmValue *scalar_values,
+                                 int *need_comma) {
+    size_t i;
+
+    for (i = 0U; i < args->count; ++i) {
+        const AstNode *arg = args->items[i];
+
+        if (arg->inferred_is_vector) {
+            if (!emit_memref_call_args(context, arg, need_comma))
+                return 0;
+        } else {
+            const LlvmValue value = scalar_values[i];
+
+            if (!value.valid) return 0;
+            if (*need_comma) fprintf(context->out, ", ");
+            fprintf(context->out, "%s %s",
+                    llvm_type(value.type), value.operand);
+            *need_comma = 1;
+        }
+    }
+
+    return 1;
+}
+
+static int generate_mlir_kernel_assignment(CodegenContext *context,
+                                           const AstNode *node) {
+    const AstNode *target = node->children[0];
+    const AstNode *expression = node->children[1];
+    KernelArgList args;
+    LlvmValue *scalar_values = NULL;
+    char name[LLVM_OPERAND_CAPACITY];
+    int need_comma = 0;
+
+    memset(&args, 0, sizeof(args));
+    if (!collect_kernel_args(context, &args, expression)) {
+        free(scalar_values);
+        kernel_arg_list_free(&args);
+        return 0;
+    }
+
+    mlir_kernel_name(node, name);
+
+    scalar_values = prepare_kernel_scalar_args(context, &args);
+    if (scalar_values == NULL) {
+        free(scalar_values);
+        kernel_arg_list_free(&args);
+        return 0;
+    }
+
+    if (expression->kind == AST_VECTOR_REDUCTION) {
+        LlvmAddress address;
+        LlvmValue value;
+        char temp[LLVM_OPERAND_CAPACITY];
+        const char *result_type;
+
+        address = generate_lvalue_address(context, target);
+        if (!address.valid) {
+            free(scalar_values);
+            kernel_arg_list_free(&args);
+            return 0;
+        }
+
+        result_type = llvm_type(expression->inferred_type);
+        new_temp(context, temp);
+        fprintf(context->out, "  %s = call %s @%s(",
+                temp, result_type, name);
+
+        if (!emit_kernel_call_args(context, &args, scalar_values, &need_comma)) {
+            free(scalar_values);
+            kernel_arg_list_free(&args);
+            return 0;
+        }
+
+        fprintf(context->out, ") nounwind ; kernel MLIR linha %d\n",
+                node->line);
+
+        value = make_value(expression->inferred_type, temp);
+        value = convert_value(context, expression, value, address.type);
+        if (!value.valid) {
+            free(scalar_values);
+            kernel_arg_list_free(&args);
+            return 0;
+        }
+
+        fprintf(context->out,
+                "  store %s %s, ptr %s ; resultado kernel MLIR\n",
+                llvm_type(address.type), value.operand, address.pointer);
+    } else {
+        const Storage *output;
+        char output_pointer[LLVM_OPERAND_CAPACITY];
+
+        output = lookup_storage(context, target->lexeme);
+        if (output == NULL || !output->is_vector) {
+            codegen_error(context, target,
+                          "destino vetorial '%s' nao possui storage LLVM",
+                          target->lexeme != NULL ? target->lexeme : "<sem-nome>");
+            free(scalar_values);
+            kernel_arg_list_free(&args);
+            return 0;
+        }
+
+        fprintf(context->out, "  call void @%s(", name);
+        if (!emit_kernel_call_args(context, &args, scalar_values, &need_comma)) {
+            free(scalar_values);
+            kernel_arg_list_free(&args);
+            return 0;
+        }
+
+        storage_pointer(output, output_pointer);
+        if (need_comma) fprintf(context->out, ", ");
+        fprintf(context->out,
+                "ptr %s, ptr %s, i64 0, i64 %zu, i64 1",
+                output_pointer, output_pointer, output->vector_size);
+        fprintf(context->out,
+                ") nounwind ; kernel MLIR linha %d\n",
+                node->line);
+    }
+
+    free(scalar_values);
+    kernel_arg_list_free(&args);
+    return 1;
+}
+
 static int generate_assignment(CodegenContext *context,
                                const AstNode *node) {
     const AstNode *target;
@@ -1772,11 +2104,8 @@ static int generate_assignment(CodegenContext *context,
     if (node == NULL || node->child_count < 2U) return 0;
     target = node->children[0];
 
-    if (target != NULL && target->inferred_is_vector) {
-        codegen_error(context, node,
-                      "atribuicao vetorial DSL requer lowering via MLIR (PjBL 4 Parte B)");
-        return 0;
-    }
+    if (is_mlir_kernel_assignment(node))
+        return generate_mlir_kernel_assignment(context, node);
 
     address = generate_lvalue_address(context, target);
     if (!address.valid) return 0;
@@ -2335,6 +2664,11 @@ static int generate_program(CodegenContext *context,
     if (!emit_record_types(context, program)) return 0;
     emit_string_globals(context);
     emit_runtime_declarations(context);
+
+    if (!emit_kernel_declarations_recursive(context, program))
+        return 0;
+    if (context->error_count == 0U)
+        fputc('\n', context->out);
 
     for (i = 0U; i < program->child_count; ++i) {
         const AstNode *node = program->children[i];

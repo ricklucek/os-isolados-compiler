@@ -414,6 +414,83 @@ Atribuições elemento a elemento usam `affine.for`; `somavet`, `maxvet` e `prod
 
 Neste checkpoint os kernels já chegam até LLVM IR válido, mas ainda não são ligados automaticamente ao módulo LLVM escalar. Essa integração híbrida será construída sobre os símbolos `@zl_mlir_kernel_N_linha`.
 
+## Integração híbrida LLVM + MLIR — Checkpoint 16
+
+O backend LLVM agora reconhece atribuições DSL válidas e emite declarações/chamadas para os kernels MLIR em vez de retornar exit 8.
+
+Os símbolos são derivados da posição no fonte:
+
+```text
+@zl_mlir_kernel_l<linha>_c<coluna>
+```
+
+Isso permite que `codegen_llvm` e `codegen_mlir` sejam executados separadamente e ainda produzam nomes idênticos.
+
+A ponte usa a ABI expandida de `memref` gerada pelo MLIR 18 para shapes estáticos:
+
+```text
+allocated pointer
+aligned pointer
+offset
+size
+stride
+```
+
+Para um vetor contíguo de N elementos, o backend passa:
+
+```text
+ptr base, ptr base, i64 0, i64 N, i64 1
+```
+
+Pipeline completo:
+
+```bash
+make hybrid-build FILE=tests/hybrid/01_elementwise_exec.mcn OUTDIR=build/hybrid
+```
+
+Etapas:
+
+```text
+fonte.mcn
+├─ -o                         -> 00_scalar.ll
+├─ --emit-mlir                -> 00_kernels.mlir
+│  └─ scripts/pipeline.sh     -> kernels/04_kernel.ll
+└─ llvm-link                  -> 05_linked.ll
+   └─ clang + runtime POSIX   -> programa
+```
+
+Para construir e executar:
+
+```bash
+make hybrid-run FILE=tests/hybrid/01_elementwise_exec.mcn
+```
+
+## Preparação da Parte C — metodologia experimental
+
+O Checkpoint 16 não publica tempos de CI como resultado científico. A CI serve apenas para correção funcional; a medição final deve ser executada em uma máquina fixa e documentada.
+
+Capturar o ambiente:
+
+```bash
+make bench-info
+```
+
+O comando registra sistema operacional, CPU, número de CPUs lógicas, arquitetura, flags SIMD visíveis e versões de LLVM/MLIR/Clang.
+
+A Parte C usará pelo menos dois núcleos:
+
+1. elemento a elemento;
+2. redução ou produto escalar.
+
+Para cada núcleo e tamanho, serão comparadas:
+
+- C0 — baseline sem otimização/vetorização;
+- C1 — LLVM `-O2`/autovetorização;
+- C2 — vetorização explícita no MLIR;
+- C3 — paralelismo MLIR/OpenMP.
+
+Cada configuração terá no mínimo 5 execuções. Tempo de compilação e tempo de execução serão armazenados separadamente, e o valor reportado será a mediana. Os detalhes estão em `docs/benchmarks.md`.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -448,6 +525,8 @@ make test-backend-prep
 make test-llvm
 make test-dsl
 make test-mlir
+make test-hybrid
+make bench-info
 make test-robustness
 make test-delivery
 make test-levels
@@ -554,8 +633,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído
 - Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído
 - Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído
-- Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — concluído nesta entrega
-- Checkpoint 16 — PjBL 4 Parte C: vetorização, paralelismo e benchmarks — próximo
+- Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — concluído
+- Checkpoint 16 — integração híbrida LLVM + MLIR e preparação experimental — concluído nesta entrega
+- Checkpoint 17 — PjBL 4 Parte C: C0/C1/C2/C3, benchmarks e gráficos — próximo
 
 
 ## Material de estudo e apresentação

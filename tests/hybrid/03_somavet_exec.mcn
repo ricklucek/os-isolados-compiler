@@ -1,0 +1,15 @@
+inteira principal() @
+[
+    inteira vet{4} a;
+    inteira soma;
+
+    a{0} receba 2;
+    a{1} receba 4;
+    a{2} receba 6;
+    a{3} receba 8;
+
+    soma receba somavet(a);
+
+    saida(soma);
+    respost 0;
+]

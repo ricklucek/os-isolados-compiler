@@ -47,12 +47,11 @@ grep -Fq 'PRODESC' "$AST" || fail "TOKEN_PRODESC ausente"
 grep -Fq 'VECTOR_REDUCTION [prodesc] {tipo=flut}' "$AST" ||
     fail "prodesc nao aplicou promocao inteira/flut"
 
-status=0
-"$BIN" tests/dsl/validos/01_elementwise.mcn -o "$IR" >/dev/null 2>&1 ||
-    status=$?
-[ "$status" -eq 8 ] ||
-    fail "DSL ainda sem MLIR deveria retornar codegen 8, recebeu $status"
-[ ! -e "$IR" ] ||
-    fail "codegen DSL deixou LLVM parcial"
+"$BIN" tests/dsl/validos/01_elementwise.mcn -o "$IR" >/dev/null ||
+    fail "backend LLVM nao emitiu ponte para kernels DSL"
+grep -q 'declare void @zl_mlir_kernel_l7_c7' "$IR" ||
+    fail "declaracao do kernel MLIR ausente no modulo escalar"
+grep -q 'call void @zl_mlir_kernel_l7_c7' "$IR" ||
+    fail "chamada do kernel MLIR ausente no modulo escalar"
 
-echo "DSL vetorial: lexer, parser, AST e semantica OK."
+echo "DSL vetorial: lexer, parser, AST, semantica e ponte LLVM OK."
