@@ -1,0 +1,14 @@
+inteira principal() @
+[
+    inteira valor;
+    inteira quocienteInteiro;
+    flut quocienteReal;
+
+    valor receba 5;
+    quocienteInteiro receba valor // 2;
+    quocienteReal receba valor / 2;
+
+    saida(quocienteInteiro);
+    saida(quocienteReal);
+    respost 0;
+]

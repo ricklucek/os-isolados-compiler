@@ -1,0 +1,23 @@
+inteira principal() @
+[
+    inteira valor;
+    valor receba 7;
+
+    cond ( valor > 0 ) edai
+    [
+        cond ( valor > 5 ) edai
+        [
+            saida(2);
+        ]
+        casocontrario edai
+        [
+            saida(1);
+        ]
+    ]
+    casocontrario edai
+    [
+        saida(0);
+    ]
+
+    respost 0;
+]

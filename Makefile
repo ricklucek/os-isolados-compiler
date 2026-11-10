@@ -5,12 +5,13 @@ TARGET := macaronica
 LLVM_AS ?= llvm-as-18
 LLVM_OPT ?= opt-18
 LLVM_LLI ?= lli-18
+LLVM_LLC ?= llc-18
 CLANG_LLVM ?= clang-18
 
 SRC := $(wildcard src/*.c)
 OBJ := $(SRC:.c=.o)
 
-.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
+.PHONY: all clean run demo check inspect check-dir emit-llvm run-llvm show-mem2reg audit-llvm check-avr package test test-lexer test-parser test-ast test-semantic test-backend-prep test-llvm test-robustness test-delivery test-levels sanitize test-sanitize watch docker-build docker-shell docker-test docker-sanitize
 
 all: $(TARGET)
 
@@ -59,6 +60,21 @@ show-mem2reg: $(TARGET)
 	@echo "Depois: .llvm-after.ll"
 	@echo "PHI encontrados:"
 	@grep -n ' phi ' .llvm-after.ll || true
+
+audit-llvm: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make audit-llvm FILE=programa.mcn"; exit 1; }
+	@./$(TARGET) "$(FILE)" -o .llvm-audit.ll >/dev/null
+	@sh scripts/audit_llvm_portability.sh .llvm-audit.ll
+	@rm -f .llvm-audit.ll
+
+check-avr: $(TARGET)
+	@test -n "$(FILE)" || { echo "Uso: make check-avr FILE=programa.mcn"; exit 1; }
+	@./$(TARGET) "$(FILE)" -o .llvm-avr.ll >/dev/null
+	@$(LLVM_AS) .llvm-avr.ll -o .llvm-avr.bc
+	@$(LLVM_LLC) -mtriple=avr -mcpu=atmega328p -filetype=obj .llvm-avr.bc -o .llvm-avr.o
+	@test -s .llvm-avr.o
+	@echo "LLVM IR compilada para objeto AVR ATmega328P."
+	@rm -f .llvm-avr.ll .llvm-avr.bc .llvm-avr.o
 
 package:
 	@rm -f macaronica-entrega.zip
@@ -187,4 +203,5 @@ docker-sanitize:
 clean:
 	rm -f $(OBJ) $(TARGET) .ast-test.out .typed-ast.out .robustness-test.out .robustness-test.err \
 		.llvm-test.ll .llvm-test.bc .llvm-test-prog .llvm-test.out .llvm-test.err .llvm-invalid.ll \
-		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll macaronica-entrega.zip
+		.llvm-run.ll .llvm-run .llvm-before.ll .llvm-after.ll .llvm-audit.ll \
+		.llvm-avr.ll .llvm-avr.bc .llvm-avr.o macaronica-entrega.zip

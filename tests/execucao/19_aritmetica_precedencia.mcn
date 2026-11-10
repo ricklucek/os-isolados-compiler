@@ -1,0 +1,15 @@
+inteira principal() @
+[
+    inteira a;
+    inteira b;
+    inteira c;
+
+    a receba 2 + 3 * 4;
+    b receba (2 + 3) * 4;
+    c receba 20 - 5 - 3;
+
+    saida(a);
+    saida(b);
+    saida(c);
+    respost 0;
+]

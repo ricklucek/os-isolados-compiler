@@ -1,0 +1,14 @@
+inteira principal() @
+[
+    inteira i;
+    flut f;
+    duplocarpado d;
+
+    i receba 2;
+    f receba 0.5;
+    d receba 1.25;
+    d receba d + i + f;
+
+    saida(d);
+    respost 0;
+]

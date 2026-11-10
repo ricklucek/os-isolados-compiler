@@ -281,6 +281,58 @@ getelementptr %struct.Pessoa, ptr %pessoa.addr, i32 0, i32 1
 
 Nenhum offset é calculado manualmente. Isso mantém a IR independente do `target datalayout` e é importante para o futuro Arduino Uno.
 
+## Fechamento do PjBL 3 — Checkpoint 13
+
+O Checkpoint 13 consolida os casos de borda e a bateria obrigatória do backend.
+
+### Divisão
+
+A política é deliberadamente híbrida:
+
+- divisor constante igual a zero: rejeição durante a geração LLVM, sem criar `.ll`;
+- divisor constante comprovadamente não nulo: nenhum check de runtime é emitido;
+- divisor calculado/dinâmico: a IR verifica zero antes de `sdiv`/`fdiv`;
+- `INT32_MIN // -1`: protegido antes de `sdiv`, com `ZL_ERRO_DIV_OVERFLOW`.
+
+Isso evita comportamento indefinido do LLVM e insere checks somente quando a condição não pode ser provada estaticamente.
+
+### Intervalo de `inteira`
+
+O contrato de backend é `inteira = i32`. Literais positivos acima de `2147483647` são recusados no codegen. A forma `-2147483648` é reconhecida explicitamente como o menor `i32` válido.
+
+Essa checagem ocorre no backend para preservar a compatibilidade dos testes históricos do front-end do PjBL 1, que não definiam largura numérica.
+
+### Auditoria de portabilidade
+
+```bash
+make audit-llvm FILE=tests/execucao/17_agregados_globais.mcn
+```
+
+verifica automaticamente:
+
+- ausência de `target triple` e `target datalayout`;
+- ausência de chamadas diretas a `printf/scanf` e similares;
+- ausência de funções variádicas;
+- índices de GEP sem `i64`;
+- `nounwind` em todas as funções geradas/declaradas.
+
+### Smoke test para Arduino Uno
+
+Ainda não é a execução na placa, mas o mesmo `.ll` já é submetido ao backend AVR:
+
+```bash
+make check-avr FILE=tests/execucao/02_variaveis_expressoes.mcn
+```
+
+O alvo usa:
+
+```text
+-mtriple=avr
+-mcpu=atmega328p
+```
+
+e exige a geração de um objeto AVR válido. A ligação com `zl_runtime_avr.c`, geração do `.hex` e gravação física entram na Parte D do PjBL 4.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -416,8 +468,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 9 — geração LLVM: tipos, variáveis e expressões — concluído
 - Checkpoint 10 — LLVM: condicionais, laços e curto-circuito — concluído
 - Checkpoint 11 — LLVM: funções, chamadas, recursão, potência e raiz — concluído
-- Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído nesta entrega
-- Checkpoint 13 — fechamento do PjBL 3: erros de execução, bateria mínima e portabilidade — próximo
+- Checkpoint 12 — LLVM: vetores, registros, GEP e bounds dinâmicos — concluído
+- Checkpoint 13 — fechamento/hardening do PjBL 3 — concluído nesta entrega
+- Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — próximo
 
 
 ## Material de estudo e apresentação

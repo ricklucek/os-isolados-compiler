@@ -3,10 +3,10 @@
 /*
  * Primeiro back-end LLVM da Macaronica.
  *
- * O Checkpoint 12 acrescenta:
- * - vetores locais/globais com getelementptr;
- * - registros nomeados LLVM e acesso a campos;
- * - verificacao dinamica de limites antes de cada acesso vetorial.
+ * O Checkpoint 13 fecha o hardening do PjBL 3:
+ * - divisao por zero detectada estaticamente quando possivel e em runtime nos demais casos;
+ * - protecao de INT32_MIN // -1 antes de sdiv;
+ * - literais inteira obrigatoriamente representaveis em i32.
  *
  * A IR continua sem offsets manuais, target triple ou target datalayout. Quando um programa valido usa uma
  * construcao ainda nao rebaixada, o gerador falha de forma controlada e o
@@ -116,6 +116,175 @@ static const char *llvm_type(LangType type) {
         case LANG_TYPE_VAZIO: return "void";
         default: return NULL;
     }
+}
+
+static void new_temp(CodegenContext *context,
+                     char buffer[LLVM_OPERAND_CAPACITY]);
+static void new_label(CodegenContext *context, const char *prefix,
+                      char buffer[LLVM_OPERAND_CAPACITY]);
+static void emit_label(CodegenContext *context, const char *label);
+static void emit_cond_branch(CodegenContext *context, const LlvmValue condition,
+                             const char *when_true, const char *when_false);
+static LlvmValue make_value(LangType type, const char *operand);
+
+static int parse_integer_literal_magnitude(const AstNode *node,
+                                           unsigned long long *out_value) {
+    char *end = NULL;
+    unsigned long long value;
+
+    if (node == NULL || node->kind != AST_INTEGER_LITERAL ||
+        node->lexeme == NULL || node->lexeme[0] == '\0')
+        return 0;
+
+    value = strtoull(node->lexeme, &end, 10);
+    if (end == node->lexeme || *end != '\0')
+        return 0;
+
+    if (out_value != NULL) *out_value = value;
+    return 1;
+}
+
+static int expression_constant_number(const AstNode *node,
+                                      double *out_value) {
+    char *end = NULL;
+    double value;
+    double sign = 1.0;
+
+    if (node == NULL) return 0;
+
+    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
+        (node->token_type == TOKEN_PLUS || node->token_type == TOKEN_MINUS)) {
+        if (!expression_constant_number(node->children[0], &value))
+            return 0;
+        if (node->token_type == TOKEN_MINUS) sign = -1.0;
+        if (out_value != NULL) *out_value = sign * value;
+        return 1;
+    }
+
+    if ((node->kind != AST_INTEGER_LITERAL &&
+         node->kind != AST_REAL_LITERAL) ||
+        node->lexeme == NULL)
+        return 0;
+
+    value = strtod(node->lexeme, &end);
+    if (end == node->lexeme || *end != '\0') return 0;
+
+    if (out_value != NULL) *out_value = value;
+    return 1;
+}
+
+static int expression_is_known_zero(const AstNode *node) {
+    double value = 0.0;
+    return expression_constant_number(node, &value) && value == 0.0;
+}
+
+static int expression_is_known_nonzero(const AstNode *node) {
+    double value = 0.0;
+    return expression_constant_number(node, &value) && value != 0.0;
+}
+
+static int expression_is_known_integer(const AstNode *node,
+                                       long long *out_value) {
+    unsigned long long magnitude = 0ULL;
+    long long value;
+    int negative = 0;
+    const AstNode *literal = node;
+
+    if (node == NULL) return 0;
+
+    if (node->kind == AST_UNARY_EXPR && node->child_count == 1U &&
+        (node->token_type == TOKEN_PLUS || node->token_type == TOKEN_MINUS)) {
+        negative = node->token_type == TOKEN_MINUS;
+        literal = node->children[0];
+    }
+
+    if (!parse_integer_literal_magnitude(literal, &magnitude) ||
+        magnitude > 2147483648ULL)
+        return 0;
+
+    if (negative) {
+        if (magnitude == 2147483648ULL)
+            value = -2147483647LL - 1LL;
+        else
+            value = -(long long)magnitude;
+    } else {
+        if (magnitude > 2147483647ULL) return 0;
+        value = (long long)magnitude;
+    }
+
+    if (out_value != NULL) *out_value = value;
+    return 1;
+}
+
+static LlvmValue emit_division_zero_guard(CodegenContext *context,
+                                          const AstNode *node,
+                                          LlvmValue divisor,
+                                          LangType type) {
+    char is_zero[LLVM_OPERAND_CAPACITY];
+    char ok_label[LLVM_OPERAND_CAPACITY];
+    char error_label[LLVM_OPERAND_CAPACITY];
+
+    new_temp(context, is_zero);
+    if (type == LANG_TYPE_INTEIRA)
+        fprintf(context->out, "  %s = icmp eq i32 %s, 0\n",
+                is_zero, divisor.operand);
+    else
+        fprintf(context->out, "  %s = fcmp oeq %s %s, 0.000000e+00\n",
+                is_zero, llvm_type(type), divisor.operand);
+
+    new_label(context, "div.nonzero", ok_label);
+    new_label(context, "div.zero", error_label);
+    emit_cond_branch(context, make_value(LANG_TYPE_BOOL, is_zero),
+                     error_label, ok_label);
+
+    emit_label(context, error_label);
+    fprintf(context->out,
+            "  call void @zl_erro_execucao(i32 2, i32 %d) nounwind\n",
+            node->line);
+    fprintf(context->out, "  unreachable\n");
+    context->block_terminated = 1;
+
+    emit_label(context, ok_label);
+    return divisor;
+}
+
+static int emit_sdiv_overflow_guard(CodegenContext *context,
+                                    const AstNode *node,
+                                    LlvmValue dividend,
+                                    LlvmValue divisor) {
+    char is_min[LLVM_OPERAND_CAPACITY];
+    char is_neg_one[LLVM_OPERAND_CAPACITY];
+    char overflow[LLVM_OPERAND_CAPACITY];
+    char ok_label[LLVM_OPERAND_CAPACITY];
+    char error_label[LLVM_OPERAND_CAPACITY];
+
+    new_temp(context, is_min);
+    new_temp(context, is_neg_one);
+    new_temp(context, overflow);
+    fprintf(context->out,
+            "  %s = icmp eq i32 %s, -2147483648\n",
+            is_min, dividend.operand);
+    fprintf(context->out,
+            "  %s = icmp eq i32 %s, -1\n",
+            is_neg_one, divisor.operand);
+    fprintf(context->out,
+            "  %s = and i1 %s, %s\n",
+            overflow, is_min, is_neg_one);
+
+    new_label(context, "sdiv.ok", ok_label);
+    new_label(context, "sdiv.overflow", error_label);
+    emit_cond_branch(context, make_value(LANG_TYPE_BOOL, overflow),
+                     error_label, ok_label);
+
+    emit_label(context, error_label);
+    fprintf(context->out,
+            "  call void @zl_erro_execucao(i32 6, i32 %d) nounwind\n",
+            node->line);
+    fprintf(context->out, "  unreachable\n");
+    context->block_terminated = 1;
+
+    emit_label(context, ok_label);
+    return 1;
 }
 
 static size_t vector_size_from_declaration(const AstNode *node) {
@@ -904,6 +1073,20 @@ static LlvmValue generate_unary(CodegenContext *context,
     char temp[LLVM_OPERAND_CAPACITY];
 
     if (node->child_count == 0U) return invalid_value();
+
+    /*
+     * 2147483648 nao cabe em i32 positivo, mas -2147483648 e o limite
+     * inferior valido. Reconhecemos essa forma antes de gerar o filho.
+     */
+    if (node->token_type == TOKEN_MINUS &&
+        node->children[0] != NULL &&
+        node->children[0]->kind == AST_INTEGER_LITERAL) {
+        unsigned long long magnitude = 0ULL;
+        if (parse_integer_literal_magnitude(node->children[0], &magnitude) &&
+            magnitude == 2147483648ULL)
+            return make_value(LANG_TYPE_INTEIRA, "-2147483648");
+    }
+
     operand = generate_expression(context, node->children[0]);
     if (!operand.valid) return operand;
 
@@ -952,12 +1135,40 @@ static LlvmValue generate_binary(CodegenContext *context,
     LangType operation_type;
     const char *type_name;
     const char *instruction = NULL;
+    int divisor_known_nonzero = 0;
+    int sdiv_overflow_impossible = 0;
     char temp[LLVM_OPERAND_CAPACITY];
 
     if (node->child_count < 2U) return invalid_value();
 
     if (node->token_type == TOKEN_E || node->token_type == TOKEN_OU)
         return generate_short_circuit(context, node);
+
+    if ((node->token_type == TOKEN_INTEGER_DIV ||
+         node->token_type == TOKEN_SLASH) &&
+        expression_is_known_zero(node->children[1])) {
+        codegen_error(context, node,
+                      "divisao por zero comprovada estaticamente");
+        return invalid_value();
+    }
+
+    if (node->token_type == TOKEN_INTEGER_DIV ||
+        node->token_type == TOKEN_SLASH)
+        divisor_known_nonzero =
+            expression_is_known_nonzero(node->children[1]);
+
+    if (node->token_type == TOKEN_INTEGER_DIV) {
+        long long left_constant = 0LL;
+        long long right_constant = 0LL;
+        int left_known =
+            expression_is_known_integer(node->children[0], &left_constant);
+        int right_known =
+            expression_is_known_integer(node->children[1], &right_constant);
+
+        if ((right_known && right_constant != -1LL) ||
+            (left_known && left_constant != (-2147483647LL - 1LL)))
+            sdiv_overflow_impossible = 1;
+    }
 
     left = generate_expression(context, node->children[0]);
     right = generate_expression(context, node->children[1]);
@@ -1069,6 +1280,18 @@ static LlvmValue generate_binary(CodegenContext *context,
     left = convert_value(context, node, left, operation_type);
     right = convert_value(context, node, right, operation_type);
     if (!left.valid || !right.valid) return invalid_value();
+
+    if ((node->token_type == TOKEN_INTEGER_DIV ||
+         node->token_type == TOKEN_SLASH) &&
+        !divisor_known_nonzero) {
+        right = emit_division_zero_guard(context, node, right, operation_type);
+        if (!right.valid) return invalid_value();
+    }
+
+    if (node->token_type == TOKEN_INTEGER_DIV &&
+        !sdiv_overflow_impossible &&
+        !emit_sdiv_overflow_guard(context, node, left, right))
+        return invalid_value();
 
     if (operation_type == LANG_TYPE_INTEIRA) {
         if (node->token_type == TOKEN_PLUS)
@@ -1230,9 +1453,20 @@ static LlvmValue generate_expression(CodegenContext *context,
     if (node == NULL) return invalid_value();
 
     switch (node->kind) {
-        case AST_INTEGER_LITERAL:
-            return make_value(LANG_TYPE_INTEIRA,
-                              node->lexeme != NULL ? node->lexeme : "0");
+        case AST_INTEGER_LITERAL: {
+            unsigned long long magnitude = 0ULL;
+
+            if (!parse_integer_literal_magnitude(node, &magnitude) ||
+                magnitude > 2147483647ULL) {
+                codegen_error(
+                    context, node,
+                    "literal inteira '%s' nao cabe em i32 (-2147483648..2147483647)",
+                    node->lexeme != NULL ? node->lexeme : "<invalido>");
+                return invalid_value();
+            }
+
+            return make_value(LANG_TYPE_INTEIRA, node->lexeme);
+        }
 
         case AST_REAL_LITERAL: {
             float rounded;

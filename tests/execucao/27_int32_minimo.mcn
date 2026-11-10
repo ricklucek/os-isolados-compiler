@@ -1,0 +1,8 @@
+inteira principal() @
+[
+    inteira minimo;
+
+    minimo receba -2147483648;
+    saida(minimo);
+    respost 0;
+]

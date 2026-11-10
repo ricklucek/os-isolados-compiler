@@ -1,0 +1,9 @@
+inteira principal() @
+[
+    inteira divisor;
+    inteira resultado;
+
+    divisor receba 0;
+    resultado receba 10 // divisor;
+    respost resultado;
+]
