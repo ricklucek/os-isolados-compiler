@@ -653,7 +653,8 @@ static void emit_runtime_declarations(CodegenContext *context) {
             "declare void @zl_pino_modo(i32, i32) nounwind\n"
             "declare void @zl_pino_escreve(i32, i32) nounwind\n"
             "declare i32 @zl_pino_le(i32) nounwind\n"
-            "declare void @zl_espera(i32) nounwind\n\n");
+            "declare void @zl_espera(i32) nounwind\n"
+            "declare ptr @zl_vetor_endereco(ptr, i32, i32) nounwind\n\n");
 }
 
 static void new_temp(CodegenContext *context,
@@ -923,10 +924,6 @@ static LlvmAddress generate_vector_address(CodegenContext *context,
 
     new_temp(context, element_pointer);
     if (context->target == CODEGEN_LLVM_TARGET_AVR) {
-        char avr_index[LLVM_OPERAND_CAPACITY];
-        char byte_offset[LLVM_OPERAND_CAPACITY];
-        char base_integer[LLVM_OPERAND_CAPACITY];
-        char address_integer[LLVM_OPERAND_CAPACITY];
         unsigned element_size;
 
         switch (storage->type) {
@@ -942,31 +939,13 @@ static LlvmAddress generate_vector_address(CodegenContext *context,
         }
 
         /*
-         * O backend AVR do LLVM 18 apresentou lowering incorreto para GEP
-         * dinamico sobre arrays locais. Depois do bounds check, o indice cabe
-         * no vetor; calculamos o endereco de dados explicitamente em i16,
-         * largura natural do ponteiro SRAM do ATmega328P.
+         * LLVM AVR 18 falha em alguns acessos dinamicos a arrays locais.
+         * O bounds check continua na IR; somente a aritmetica do endereco SRAM
+         * e delegada a um helper da plataforma compilado por avr-gcc.
          */
-        new_temp(context, avr_index);
-        new_temp(context, byte_offset);
-        new_temp(context, base_integer);
-        new_temp(context, address_integer);
-
         fprintf(context->out,
-                "  %s = trunc i32 %s to i16 ; indice AVR verificado\n",
-                avr_index, index.operand);
-        fprintf(context->out,
-                "  %s = mul i16 %s, %u ; deslocamento em bytes AVR\n",
-                byte_offset, avr_index, element_size);
-        fprintf(context->out,
-                "  %s = ptrtoint ptr %s to i16\n",
-                base_integer, base_pointer);
-        fprintf(context->out,
-                "  %s = add i16 %s, %s\n",
-                address_integer, base_integer, byte_offset);
-        fprintf(context->out,
-                "  %s = inttoptr i16 %s to ptr\n",
-                element_pointer, address_integer);
+                "  %s = call ptr @zl_vetor_endereco(ptr %s, i32 %s, i32 %u) nounwind\n",
+                element_pointer, base_pointer, index.operand, element_size);
     } else {
         fprintf(context->out,
                 "  %s = getelementptr [%zu x %s], ptr %s, i32 0, i32 %s\n",

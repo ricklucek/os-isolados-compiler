@@ -121,6 +121,11 @@ void zl_espera(int32_t milissegundos) {
     }
 }
 
+void *zl_vetor_endereco(void *base, int32_t indice, int32_t tamanho_elemento) {
+    unsigned char *bytes = (unsigned char *)base;
+    return (void *)(bytes + (size_t)indice * (size_t)tamanho_elemento);
+}
+
 int main(void) {
     return (int)zl_principal();
 }

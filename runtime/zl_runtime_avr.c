@@ -200,6 +200,13 @@ void zl_espera(int32_t milissegundos) {
         _delay_ms(1.0);
 }
 
+void *zl_vetor_endereco(void *base, int32_t indice, int32_t tamanho_elemento) {
+    uint8_t *bytes = (uint8_t *)base;
+    uint16_t deslocamento =
+        (uint16_t)indice * (uint16_t)tamanho_elemento;
+    return (void *)(bytes + deslocamento);
+}
+
 void zl_erro_execucao(int32_t codigo, int32_t linha) {
     int32_t i;
     int32_t flashes = codigo > 0 && codigo < 10 ? codigo : 1;

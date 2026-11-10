@@ -30,6 +30,7 @@ void zl_pino_modo(int32_t pino, int32_t modo);
 void zl_pino_escreve(int32_t pino, int32_t valor);
 int32_t zl_pino_le(int32_t pino);
 void zl_espera(int32_t milissegundos);
+void *zl_vetor_endereco(void *base, int32_t indice, int32_t tamanho_elemento);
 
 enum {
     ZL_PINO_ENTRADA = 0,
