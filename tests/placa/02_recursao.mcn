@@ -1,0 +1,17 @@
+outrafuncao inteira fatorial(inteira n) @
+[
+    cond ( n < 2 ) edai
+    [
+        respost 1;
+    ]
+    casocontrario edai
+    [
+        respost n * fatorial(n - 1);
+    ]
+]
+
+inteira principal() @
+[
+    saida(fatorial(5));
+    respost 0;
+]

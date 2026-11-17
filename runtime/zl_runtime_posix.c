@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static int32_t zl_pinos_simulados[20];
+static int32_t zl_modos_simulados[20];
+
 void zl_imprime_int(int32_t valor) {
     printf("%" PRId32, valor);
 }
@@ -82,6 +85,45 @@ double zl_raiz_duplo(double valor, int32_t linha) {
     if (valor < 0.0)
         zl_erro_execucao(ZL_ERRO_RAIZ_NEGATIVA, linha);
     return sqrt(valor);
+}
+
+void zl_pino_modo(int32_t pino, int32_t modo) {
+    if (pino < 0 || pino >= 20 ||
+        modo < ZL_PINO_ENTRADA || modo > ZL_PINO_ENTRADA_PULLUP)
+        zl_erro_execucao(ZL_ERRO_ARITMETICO, 0);
+    zl_modos_simulados[pino] = modo;
+    if (modo == ZL_PINO_ENTRADA_PULLUP)
+        zl_pinos_simulados[pino] = 1;
+}
+
+void zl_pino_escreve(int32_t pino, int32_t valor) {
+    if (pino < 0 || pino >= 20)
+        zl_erro_execucao(ZL_ERRO_ARITMETICO, 0);
+    zl_pinos_simulados[pino] = valor != 0;
+}
+
+int32_t zl_pino_le(int32_t pino) {
+    if (pino < 0 || pino >= 20)
+        zl_erro_execucao(ZL_ERRO_ARITMETICO, 0);
+    return zl_pinos_simulados[pino];
+}
+
+void zl_espera(int32_t milissegundos) {
+    volatile unsigned long i;
+    volatile unsigned long limite;
+
+    if (milissegundos < 0)
+        zl_erro_execucao(ZL_ERRO_ARITMETICO, 0);
+
+    limite = (unsigned long)milissegundos * 1000UL;
+    for (i = 0UL; i < limite; ++i) {
+        /* simulacao POSIX: atraso aproximado, sem dependencia externa */
+    }
+}
+
+void *zl_vetor_endereco(void *base, int32_t indice, int32_t tamanho_elemento) {
+    unsigned char *bytes = (unsigned char *)base;
+    return (void *)(bytes + (size_t)indice * (size_t)tamanho_elemento);
 }
 
 int main(void) {

@@ -1,0 +1,19 @@
+inteira principal() @
+[
+    inteira estado;
+
+    pinomodo(2, 2);
+    pinomodo(13, 1);
+    estado receba pinole(2);
+
+    cond ( estado == 0 ) edai
+    [
+        pinoescreve(13, 1);
+    ]
+    casocontrario edai
+    [
+        pinoescreve(13, 0);
+    ]
+
+    respost 0;
+]

@@ -1,0 +1,7 @@
+inteira principal() @
+[
+    inteira vet{400} dados;
+    dados{0} receba 1;
+    saida(dados{0});
+    respost 0;
+]

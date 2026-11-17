@@ -17,6 +17,11 @@ typedef struct {
     size_t error_count;
 } CodegenLlvmResult;
 
+typedef enum {
+    CODEGEN_LLVM_TARGET_PORTABLE = 0,
+    CODEGEN_LLVM_TARGET_AVR
+} CodegenLlvmTarget;
+
 /*
  * Emite LLVM IR textual a partir de uma AST que ja passou pela analise
  * semantica. O back-end consome inferred_type; ele nao repete inferencia.
@@ -24,5 +29,9 @@ typedef struct {
 CodegenLlvmResult codegen_llvm_generate(const AstNode *ast,
                                         FILE *output,
                                         FILE *error_stream);
+CodegenLlvmResult codegen_llvm_generate_target(const AstNode *ast,
+                                               FILE *output,
+                                               FILE *error_stream,
+                                               CodegenLlvmTarget target);
 
 #endif

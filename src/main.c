@@ -18,13 +18,14 @@
 
 static void print_usage(FILE *stream, const char *program) {
     fprintf(stream,
-            "Uso: %s <arquivo.mcn> [--tokens] [--ast] [--lexer-only] [--parser-only] [-o saida.ll] [--emit-mlir saida.mlir]\n",
+            "Uso: %s <arquivo.mcn> [--alvo=pc|uno] [--tokens] [--ast] [--lexer-only] [--parser-only] [-o saida.ll] [--emit-mlir saida.mlir]\n",
             program);
 }
 
 static void print_help(const char *program) {
     print_usage(stdout, program);
     printf("\nOpcoes:\n");
+    printf("  --alvo=pc|uno  aplica verificacoes dependentes do alvo (padrao: pc)\n");
     printf("  --tokens       exibe o fluxo de tokens gerado pelo lexer\n");
     printf("  --ast          exibe a AST produzida pelo parser\n");
     printf("  --lexer-only   executa somente a analise lexica\n");
@@ -51,6 +52,7 @@ int main(int argc, char *argv[]) {
     const char *source_path;
     const char *output_path = NULL;
     const char *mlir_output_path = NULL;
+    SemanticTarget target = SEMANTIC_TARGET_PC;
     int print_tokens = 0;
     int print_ast = 0;
     int lexer_only = 0;
@@ -78,7 +80,19 @@ int main(int argc, char *argv[]) {
 
     source_path = argv[1];
     for (i = 2; i < argc; ++i) {
-        if (strcmp(argv[i], "--tokens") == 0)
+        if (strncmp(argv[i], "--alvo=", 7U) == 0) {
+            const char *value = argv[i] + 7;
+            if (strcmp(value, "pc") == 0)
+                target = SEMANTIC_TARGET_PC;
+            else if (strcmp(value, "uno") == 0)
+                target = SEMANTIC_TARGET_UNO;
+            else {
+                fprintf(stderr,
+                        "Erro: alvo '%s' desconhecido; use pc ou uno.\n",
+                        value);
+                return COMPILER_EXIT_USAGE;
+            }
+        } else if (strcmp(argv[i], "--tokens") == 0)
             print_tokens = 1;
         else if (strcmp(argv[i], "--ast") == 0)
             print_ast = 1;
@@ -198,6 +212,9 @@ int main(int argc, char *argv[]) {
     }
 
     semantic_result = semantic_analyze(ast, stderr);
+    if (semantic_result.status == SEMANTIC_OK)
+        semantic_result = semantic_validate_target(ast, target, stderr);
+
     if (semantic_result.status == SEMANTIC_HAS_ERRORS) {
         compiler_print_phase_failure(stderr, COMPILER_PHASE_SEMANTIC,
                                      semantic_result.error_count);
@@ -270,8 +287,11 @@ int main(int argc, char *argv[]) {
             return COMPILER_EXIT_CODEGEN_INTERNAL;
         }
 
-        codegen_result =
-            codegen_llvm_generate(ast, llvm_output, stderr);
+        codegen_result = codegen_llvm_generate_target(
+            ast, llvm_output, stderr,
+            target == SEMANTIC_TARGET_UNO
+                ? CODEGEN_LLVM_TARGET_AVR
+                : CODEGEN_LLVM_TARGET_PORTABLE);
         close_failed = fclose(llvm_output) != 0;
 
         if (codegen_result.status != CODEGEN_LLVM_OK || close_failed) {

@@ -539,6 +539,55 @@ make bench-smoke
 
 com N=1024, uma repetição e duas threads, para provar que C0–C3 compilam/executam. Esses tempos não devem ser usados no relatório.
 
+## Arduino Uno — PjBL 4 Parte D
+
+O alvo físico escolhido é **Arduino Uno / ATmega328P**, 16 MHz, AVR de 8 bits.
+
+Gerar um executável:
+
+```bash
+make placa PROG=tests/placa/01_laco_vetor.mcn
+```
+
+O pipeline é:
+
+```text
+Macaronica
+  -> --alvo=uno -o programa.ll
+  -> llvm-as
+  -> llc-18 -mtriple=avr -mcpu=atmega328p
+  -> programa.o
+  + runtime/zl_runtime_avr.c
+  -> avr-gcc
+  -> programa.elf
+  -> avr-objcopy
+  -> programa.hex
+```
+
+`--alvo=uno` ativa verificações semânticas específicas:
+- RAM total do ATmega328P: 2048 B;
+- orçamento conservador para globais + frame local: 1792 B;
+- 256 B reservados para runtime, endereços de retorno e temporários;
+- `duplocarpado` de 64 bits é rejeitado no Uno.
+
+Builtins físicos da Macaronica:
+
+```text
+pinomodo(pino, modo);
+pinoescreve(pino, valor);
+valor receba pinole(pino);
+espera(ms);
+```
+
+Modos:
+- `0`: entrada;
+- `1`: saída;
+- `2`: entrada com pull-up.
+
+A numeração segue a placa: 0–13 são os digitais e 14–19 correspondem a A0–A5. O LED embutido usa o pino 13.
+
+Detalhes de construção, gravação e testes físicos estão em `docs/placa.md`.
+
 ## Códigos de saída
 
 | Código | Resultado |
@@ -576,6 +625,7 @@ make test-mlir
 make test-hybrid
 make bench-info
 make bench-smoke
+make test-uno
 make test-robustness
 make test-delivery
 make test-levels
@@ -684,8 +734,9 @@ Cada fase interrompe o pipeline quando encontra uma classe de erro que impede a 
 - Checkpoint 14 — PjBL 4 Parte A: DSL vetorial, tokens, gramática, AST e semântica — concluído
 - Checkpoint 15 — PjBL 4 Parte B: codegen MLIR e pipeline de lowering — concluído
 - Checkpoint 16 — integração híbrida LLVM + MLIR e preparação experimental — concluído
-- Checkpoint 17 — PjBL 4 Parte C: C0/C1/C2/C3, benchmarks e gráficos — concluído nesta entrega
-- Checkpoint 18 — PjBL 4 Parte D: runtime AVR, --alvo=uno, memória e geração .hex — próximo
+- Checkpoint 17 — PjBL 4 Parte C: C0/C1/C2/C3, benchmarks e gráficos — concluído
+- Checkpoint 18 — PjBL 4 Parte D: Arduino Uno, runtime AVR e geração .hex — concluído nesta entrega
+- Checkpoint 19 — validação física final, artefatos da placa e preparação da apresentação — próximo
 
 
 ## Material de estudo e apresentação
