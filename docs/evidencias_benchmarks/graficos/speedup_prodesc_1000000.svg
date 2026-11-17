@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520">
+<rect width="100%" height="100%" fill="white"/>
+<text x="480.0" y="28" text-anchor="middle" font-size="20">Speedup C3 vs C0 — prodesc — N=1000000</text>
+<line x1="90" y1="55" x2="90" y2="430" stroke="black"/>
+<line x1="90" y1="430" x2="930" y2="430" stroke="black"/>
+<text x="18" y="242.5" transform="rotate(-90 18 242.5)" text-anchor="middle" font-size="14">speedup (x)</text>
+<rect x="129.9" y="55.0" width="130.2" height="375.0" fill="#555"/>
+<text x="195.0" y="49.0" text-anchor="middle" font-size="11">3.401</text>
+<text x="195.0" y="450" text-anchor="middle" font-size="11">C3-t1</text>
+<rect x="339.9" y="75.8" width="130.2" height="354.2" fill="#555"/>
+<text x="405.0" y="69.8" text-anchor="middle" font-size="11">3.212</text>
+<text x="405.0" y="450" text-anchor="middle" font-size="11">C3-t2</text>
+<rect x="549.9" y="77.8" width="130.2" height="352.2" fill="#555"/>
+<text x="615.0" y="71.8" text-anchor="middle" font-size="11">3.194</text>
+<text x="615.0" y="450" text-anchor="middle" font-size="11">C3-t4</text>
+<rect x="759.9" y="79.1" width="130.2" height="350.9" fill="#555"/>
+<text x="825.0" y="73.1" text-anchor="middle" font-size="11">3.182</text>
+<text x="825.0" y="450" text-anchor="middle" font-size="11">C3-t8</text>
+</svg>
